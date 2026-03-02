@@ -73,7 +73,7 @@ export const useOneDriveAuth = () => {
   const [authToken, setAuthToken] = useState<StoredAuthToken | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  const [request, response, promptAsync] = useAuthRequest(
+  const [request, , promptAsync] = useAuthRequest(
     {
       clientId: clientId ?? '',
       scopes: ONEDRIVE_SCOPES,
@@ -96,23 +96,19 @@ export const useOneDriveAuth = () => {
     void loadStoredToken();
   }, []);
 
-  useEffect(() => {
-    const exchangeCode = async () => {
-      if (response?.type !== 'success') {
-        return;
-      }
-
-      if (!request?.codeVerifier || !clientId) {
-        return;
+  const exchangeAuthCode = useCallback(
+    async (code: string, codeVerifier: string) => {
+      if (!clientId) {
+        throw new OneDriveAuthError('EXPO_PUBLIC_ONEDRIVE_CLIENT_ID 환경 변수가 필요합니다.');
       }
 
       const tokenResponse = await exchangeCodeAsync(
         {
           clientId,
-          code: response.params.code,
+          code,
           redirectUri,
           extraParams: {
-            code_verifier: request.codeVerifier,
+            code_verifier: codeVerifier,
           },
         },
         ONEDRIVE_DISCOVERY,
@@ -126,12 +122,9 @@ export const useOneDriveAuth = () => {
 
       await writeStoredToken(nextToken);
       setAuthToken(nextToken);
-    };
-
-    void exchangeCode().catch(() => {
-      // no-op: 로그인 버튼에서 사용자 친화 메시지를 처리합니다.
-    });
-  }, [clientId, redirectUri, request?.codeVerifier, response]);
+    },
+    [clientId, redirectUri],
+  );
 
   const getValidAccessToken = useCallback(async (): Promise<string | null> => {
     if (!authToken) {
@@ -178,7 +171,14 @@ export const useOneDriveAuth = () => {
     if (result.type !== 'success') {
       throw new OneDriveAuthError('OneDrive 로그인에 실패했습니다. 다시 시도해 주세요.');
     }
-  }, [clientId, promptAsync, request]);
+
+    const code = result.params.code;
+    if (!code || !request.codeVerifier) {
+      throw new OneDriveAuthError('OneDrive 인증 응답을 처리하지 못했습니다. 다시 시도해 주세요.');
+    }
+
+    await exchangeAuthCode(code, request.codeVerifier);
+  }, [clientId, exchangeAuthCode, promptAsync, request]);
 
   const signOut = useCallback(async () => {
     if (authToken?.accessToken && clientId) {

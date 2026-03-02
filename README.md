@@ -29,6 +29,27 @@ Joplin이 OneDrive로 동기화한 TODO를 읽어 앱/위젯에 표시하는 프
    npx expo start
    ```
 
+## 빌드 방법
+
+### Android 개발 빌드
+
+```bash
+npx expo run:android
+```
+
+### iOS 개발 빌드
+
+```bash
+npx expo run:ios
+```
+
+### 프로덕션 빌드 (EAS)
+
+```bash
+npx eas build --platform android
+npx eas build --platform ios
+```
+
 ## 동작 요약
 
 - 앱 첫 화면에서 OneDrive 로그인 버튼으로 OAuth 인증을 수행합니다.
