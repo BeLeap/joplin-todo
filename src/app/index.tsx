@@ -8,11 +8,13 @@ import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
 import { EncryptedJoplinSyncError } from '@/features/sync/errors';
 import { MockOneDriveJoplinSource } from '@/features/sync/mock-onedrive-source';
 import { syncTodosFromOneDrive } from '@/features/sync/sync-todos';
+import { InMemoryWidgetBridge, publishTodosToWidget } from '@/features/widget/widget-bridge';
 import type { TodoItem } from '@/features/todo/types';
 import { InMemoryTodoCache } from '@/storage/todo-cache';
 
 const source = new MockOneDriveJoplinSource();
 const cache = new InMemoryTodoCache();
+const widgetBridge = new InMemoryWidgetBridge();
 
 type SyncStatus = 'idle' | 'syncing' | 'success' | 'error';
 
@@ -47,6 +49,7 @@ export default function HomeScreen() {
     const snapshot = await cache.loadTodos();
     setTodos(snapshot.todos);
     setLastSyncedAt(snapshot.lastSyncedAt);
+    await publishTodosToWidget(widgetBridge, snapshot.todos, snapshot.lastSyncedAt);
   }, []);
 
   const refreshTodos = useCallback(async () => {
@@ -57,6 +60,7 @@ export default function HomeScreen() {
       const result = await syncTodosFromOneDrive(source, cache);
       setTodos(result.todos);
       setLastSyncedAt(result.syncedAt);
+      await publishTodosToWidget(widgetBridge, result.todos, result.syncedAt);
       setStatus('success');
     } catch (error) {
       await loadCachedTodos();
