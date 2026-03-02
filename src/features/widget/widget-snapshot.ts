@@ -34,10 +34,23 @@ export const serializeWidgetSnapshot = (snapshot: WidgetSnapshot): string =>
 export const parseWidgetSnapshot = (value: string): WidgetSnapshot => {
   const parsed = JSON.parse(value) as WidgetSnapshot;
 
+  const hasInvalidTodo =
+    !Array.isArray(parsed.todos) ||
+    parsed.todos.some(
+      (todo) =>
+        typeof todo?.id !== 'string' ||
+        typeof todo?.title !== 'string' ||
+        (todo?.due !== null && typeof todo?.due !== 'string') ||
+        typeof todo?.completed !== 'boolean',
+    );
+
   if (
     parsed.version !== WIDGET_SNAPSHOT_VERSION ||
-    !Array.isArray(parsed.todos) ||
-    typeof parsed.state !== 'string'
+    typeof parsed.generatedAt !== 'string' ||
+    (parsed.lastSyncedAt !== null && typeof parsed.lastSyncedAt !== 'string') ||
+    !['syncing', 'ready', 'empty', 'error'].includes(parsed.state) ||
+    (parsed.errorMessage !== null && typeof parsed.errorMessage !== 'string') ||
+    hasInvalidTodo
   ) {
     throw new Error('Invalid widget snapshot payload');
   }

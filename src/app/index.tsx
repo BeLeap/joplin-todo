@@ -13,7 +13,7 @@ import {
 } from '@/features/sync/errors';
 import { MockOneDriveJoplinSource } from '@/features/sync/mock-onedrive-source';
 import { GraphOneDriveJoplinSource, type OneDriveJoplinSource } from '@/features/sync/onedrive-source';
-import { syncTodosFromOneDrive } from '@/features/sync/sync-todos';
+import { syncTodosFromOneDriveWithCacheFallback } from '@/features/sync/sync-todos';
 import { InMemoryWidgetBridge, publishTodosToWidget } from '@/features/widget/widget-bridge';
 import { getWidgetSnapshotState } from '@/features/widget/widget-state';
 import type { TodoItem } from '@/features/todo/types';
@@ -99,16 +99,21 @@ export default function HomeScreen() {
     });
 
     try {
-      const result = await syncTodosFromOneDrive(source, cache, {
+      const result = await syncTodosFromOneDriveWithCacheFallback(source, cache, {
         maxRetries: 2,
         retryDelayMs: 500,
       });
       setTodos(result.todos);
       setLastSyncedAt(result.syncedAt);
+      const friendlyError = result.fromCache
+        ? '네트워크 문제로 마지막 캐시를 표시합니다.'
+        : null;
       await publishTodosToWidget(widgetBridge, result.todos, result.syncedAt, {
-        state: getWidgetSnapshotState(result.todos.length, 'ready'),
+        state: getWidgetSnapshotState(result.todos.length, result.fromCache ? 'error' : 'ready'),
+        errorMessage: friendlyError,
       });
-      setStatus('success');
+      setStatus(result.fromCache ? 'error' : 'success');
+      setErrorMessage(friendlyError);
     } catch (error) {
       const friendlyError = toUserFriendlyError(error);
       await loadCachedTodos();

@@ -15,3 +15,7 @@ export type TodoSyncResult = {
   syncedAt: string;
   source: 'onedrive';
 };
+
+export type TodoSyncWithFallbackResult = TodoSyncResult & {
+  fromCache: boolean;
+};

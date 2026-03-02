@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 
-import { getWidgetRefreshIntervalMs } from '@/features/widget/widget-refresh-policy';
+import { getNextWidgetRefreshAt, getWidgetRefreshIntervalMs } from '@/features/widget/widget-refresh-policy';
 import { getWidgetSnapshotState } from '@/features/widget/widget-state';
 import { InMemoryWidgetBridge, publishTodosToWidget } from '@/features/widget/widget-bridge';
 import {
@@ -43,6 +43,7 @@ const run = async () => {
   assert.deepEqual(parsed, snapshot, '직렬화/역직렬화 시 동일해야 합니다.');
 
   assert.equal(getWidgetRefreshIntervalMs(15), 900000, '분 단위 주기 계산이 맞아야 합니다.');
+  assert.equal(getWidgetRefreshIntervalMs(1), 300000, '최소 주기는 5분으로 보정되어야 합니다.');
 
   assert.equal(getWidgetSnapshotState(3, 'ready'), 'ready');
   assert.equal(getWidgetSnapshotState(0, 'ready'), 'empty');
@@ -65,6 +66,22 @@ const run = async () => {
   const reparsed = parseWidgetSnapshot(published.serializedSnapshot);
   assert.deepEqual(reparsed, published.snapshot, '발행 결과의 직렬화 데이터가 유효해야 합니다.');
 
+  assert.throws(
+    () =>
+      parseWidgetSnapshot(
+        JSON.stringify({
+          version: 1,
+          generatedAt: '2026-03-02T09:30:00.000Z',
+          lastSyncedAt: null,
+          state: 'ready',
+          errorMessage: null,
+          todos: [{ id: 1, title: 'bad', due: null, completed: false }],
+        }),
+      ),
+    Error,
+    '잘못된 스냅샷 스키마는 파싱 실패해야 합니다.',
+  );
+
   const refreshAt = await bridge.loadRefreshRequest();
   assert.ok(refreshAt, '새로고침 요청 시각이 저장되어야 합니다.');
   assert.equal(typeof published.refreshAt, 'string');
@@ -77,6 +94,9 @@ const run = async () => {
   });
   assert.equal(errorPublished.snapshot.state, 'error');
   assert.equal(errorPublished.snapshot.errorMessage, '동기화 실패');
+
+  const errorRefreshAt = getNextWidgetRefreshAt(new Date('2026-03-02T11:00:00.000Z'), 'error', 30);
+  assert.equal(errorRefreshAt, '2026-03-02T11:15:00.000Z', '오류 시 다음 실행 주기는 절반으로 단축됩니다.');
 
   await bridge.clearSnapshot();
   assert.equal(await bridge.loadSnapshot(), null, 'clear 후 null이어야 합니다.');

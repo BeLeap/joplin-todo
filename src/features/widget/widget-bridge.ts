@@ -4,7 +4,7 @@ import { createWidgetSnapshot, serializeWidgetSnapshot } from './widget-snapshot
 import type { WidgetSnapshot, WidgetSnapshotState } from './types';
 import {
   DEFAULT_WIDGET_REFRESH_INTERVAL_MINUTES,
-  getWidgetRefreshIntervalMs,
+  getNextWidgetRefreshAt,
 } from './widget-refresh-policy';
 
 export interface WidgetBridge {
@@ -74,9 +74,11 @@ export const publishTodosToWidget = async (
 
   const refreshIntervalMinutes =
     options?.refreshIntervalMinutes ?? DEFAULT_WIDGET_REFRESH_INTERVAL_MINUTES;
-  const refreshAt = new Date(
-    Date.now() + getWidgetRefreshIntervalMs(refreshIntervalMinutes),
-  ).toISOString();
+  const refreshAt = getNextWidgetRefreshAt(
+    new Date(),
+    options?.state === 'error' ? 'error' : 'ready',
+    refreshIntervalMinutes,
+  );
 
   await bridge.saveSnapshot(snapshot);
   await bridge.requestRefresh(refreshAt);
