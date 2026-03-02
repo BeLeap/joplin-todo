@@ -17,7 +17,7 @@ import { syncTodosFromOneDriveWithCacheFallback } from '@/features/sync/sync-tod
 import { InMemoryWidgetBridge, publishTodosToWidget } from '@/features/widget/widget-bridge';
 import { getWidgetSnapshotState } from '@/features/widget/widget-state';
 import type { TodoItem } from '@/features/todo/types';
-import { InMemoryTodoCache } from '@/storage/todo-cache';
+import { AsyncStorageTodoCache } from '@/storage/todo-cache';
 
 const createSyncSource = (): OneDriveJoplinSource => {
   const token = process.env.EXPO_PUBLIC_ONEDRIVE_ACCESS_TOKEN;
@@ -29,7 +29,7 @@ const createSyncSource = (): OneDriveJoplinSource => {
 };
 
 const source = createSyncSource();
-const cache = new InMemoryTodoCache();
+const cache = new AsyncStorageTodoCache();
 const widgetBridge = new InMemoryWidgetBridge();
 
 type SyncStatus = 'idle' | 'syncing' | 'success' | 'error';
