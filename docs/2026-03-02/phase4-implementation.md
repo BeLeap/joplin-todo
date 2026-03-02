@@ -22,6 +22,12 @@
    - `src/app/index.tsx`
    - 캐시 로드/동기화 성공 시점마다 위젯 스냅샷을 함께 갱신하도록 연결
 
+
+5. **주기적 갱신 스케줄 데이터 추가**
+   - `src/features/widget/widget-refresh-policy.ts`
+   - 기본 갱신 주기(30분)와 분→밀리초 변환 유틸을 추가했습니다.
+   - `publishTodosToWidget`에서 다음 갱신 시각(`refreshAt`)을 계산해 브리지로 전달하도록 확장했습니다.
+
 ## 검증
 
 - `npx tsx tests/phase1/phase1-check.ts`
