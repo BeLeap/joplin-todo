@@ -2,13 +2,35 @@ import assert from 'node:assert/strict';
 
 import { getNextWidgetRefreshAt, getWidgetRefreshIntervalMs } from '@/features/widget/widget-refresh-policy';
 import { getWidgetSnapshotState } from '@/features/widget/widget-state';
-import { InMemoryWidgetBridge, publishTodosToWidget } from '@/features/widget/widget-bridge';
+import {
+  AsyncStorageWidgetBridge,
+  InMemoryWidgetBridge,
+  publishTodosToWidget,
+} from '@/features/widget/widget-bridge';
 import {
   createWidgetSnapshot,
   parseWidgetSnapshot,
   serializeWidgetSnapshot,
 } from '@/features/widget/widget-snapshot';
 import type { TodoItem } from '@/features/todo/types';
+
+
+
+class MemoryStorage {
+  private readonly map = new Map<string, string>();
+
+  async setItem(key: string, value: string) {
+    this.map.set(key, value);
+  }
+
+  async getItem(key: string) {
+    return this.map.get(key) ?? null;
+  }
+
+  async removeItem(key: string) {
+    this.map.delete(key);
+  }
+}
 
 const run = async () => {
   const todos: TodoItem[] = [
@@ -101,6 +123,25 @@ const run = async () => {
   await bridge.clearSnapshot();
   assert.equal(await bridge.loadSnapshot(), null, 'clear 후 null이어야 합니다.');
   assert.equal(await bridge.loadRefreshRequest(), null, 'clear 후 refreshAt은 null이어야 합니다.');
+
+
+
+  const storage = new MemoryStorage();
+  const storageBridge = new AsyncStorageWidgetBridge(storage);
+  await storageBridge.saveSnapshot(snapshot);
+  const fromStorage = await storageBridge.loadSnapshot();
+  assert.deepEqual(fromStorage, snapshot, 'AsyncStorage 브리지가 스냅샷을 복원해야 합니다.');
+
+  await storageBridge.requestRefresh('2026-03-02T12:00:00.000Z');
+  assert.equal(
+    await storageBridge.loadRefreshRequest(),
+    '2026-03-02T12:00:00.000Z',
+    'AsyncStorage 브리지가 refreshAt을 저장해야 합니다.',
+  );
+
+  await storageBridge.clearSnapshot();
+  assert.equal(await storageBridge.loadSnapshot(), null, 'clear 후 스냅샷이 삭제되어야 합니다.');
+  assert.equal(await storageBridge.loadRefreshRequest(), null, 'clear 후 refreshAt이 삭제되어야 합니다.');
 
   console.log('phase4-check: ok');
 };
