@@ -1,6 +1,7 @@
 import type { TodoItem } from '@/features/todo/types';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
-import { createWidgetSnapshot, serializeWidgetSnapshot } from './widget-snapshot';
+import { createWidgetSnapshot, parseWidgetSnapshot, serializeWidgetSnapshot } from './widget-snapshot';
 import type { WidgetSnapshot, WidgetSnapshotState } from './types';
 import {
   DEFAULT_WIDGET_REFRESH_INTERVAL_MINUTES,
@@ -12,6 +13,51 @@ export interface WidgetBridge {
   loadSnapshot(): Promise<WidgetSnapshot | null>;
   clearSnapshot(): Promise<void>;
   requestRefresh(refreshAt: string): Promise<void>;
+}
+
+type KeyValueStorage = {
+  setItem(key: string, value: string): Promise<void>;
+  getItem(key: string): Promise<string | null>;
+  removeItem(key: string): Promise<void>;
+};
+
+const SNAPSHOT_KEY = 'widget:snapshot';
+const REFRESH_AT_KEY = 'widget:refresh-at';
+
+export class AsyncStorageWidgetBridge implements WidgetBridge {
+  constructor(
+    private readonly storage: KeyValueStorage = AsyncStorage,
+    private readonly snapshotKey = SNAPSHOT_KEY,
+    private readonly refreshAtKey = REFRESH_AT_KEY,
+  ) {}
+
+  async saveSnapshot(snapshot: WidgetSnapshot): Promise<void> {
+    await this.storage.setItem(this.snapshotKey, serializeWidgetSnapshot(snapshot));
+  }
+
+  async loadSnapshot(): Promise<WidgetSnapshot | null> {
+    const serialized = await this.storage.getItem(this.snapshotKey);
+    if (!serialized) {
+      return null;
+    }
+
+    return parseWidgetSnapshot(serialized);
+  }
+
+  async clearSnapshot(): Promise<void> {
+    await Promise.all([
+      this.storage.removeItem(this.snapshotKey),
+      this.storage.removeItem(this.refreshAtKey),
+    ]);
+  }
+
+  async requestRefresh(refreshAt: string): Promise<void> {
+    await this.storage.setItem(this.refreshAtKey, refreshAt);
+  }
+
+  async loadRefreshRequest(): Promise<string | null> {
+    return this.storage.getItem(this.refreshAtKey);
+  }
 }
 
 export class InMemoryWidgetBridge implements WidgetBridge {
