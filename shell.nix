@@ -11,7 +11,7 @@ in
   pkgs.mkShell {
     packages = with pkgs; [
       nodejs_20
-      # watchman
+      watchman
       jdk17
       git
       androidenv.androidPkgs.androidsdk
