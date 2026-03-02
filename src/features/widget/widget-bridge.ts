@@ -1,7 +1,7 @@
 import type { TodoItem } from '@/features/todo/types';
 
 import { createWidgetSnapshot, serializeWidgetSnapshot } from './widget-snapshot';
-import type { WidgetSnapshot } from './types';
+import type { WidgetSnapshot, WidgetSnapshotState } from './types';
 import {
   DEFAULT_WIDGET_REFRESH_INTERVAL_MINUTES,
   getWidgetRefreshIntervalMs,
@@ -47,6 +47,8 @@ export class InMemoryWidgetBridge implements WidgetBridge {
 
 export type WidgetPublishOptions = {
   refreshIntervalMinutes?: number;
+  state?: WidgetSnapshotState;
+  errorMessage?: string | null;
 };
 
 export type WidgetPublishResult = {
@@ -61,7 +63,13 @@ export const publishTodosToWidget = async (
   lastSyncedAt: string | null,
   options?: WidgetPublishOptions,
 ): Promise<WidgetPublishResult> => {
-  const snapshot = createWidgetSnapshot(todos, lastSyncedAt);
+  const snapshot = createWidgetSnapshot(
+    todos,
+    lastSyncedAt,
+    20,
+    options?.state ?? (todos.length > 0 ? 'ready' : 'empty'),
+    options?.errorMessage ?? null,
+  );
   const serializedSnapshot = serializeWidgetSnapshot(snapshot);
 
   const refreshIntervalMinutes =
