@@ -13,7 +13,20 @@ export interface WidgetBridge {
   loadSnapshot(): Promise<WidgetSnapshot | null>;
   clearSnapshot(): Promise<void>;
   requestRefresh(refreshAt: string): Promise<void>;
+  loadRefreshRequest(): Promise<string | null>;
+  clearRefreshRequest(): Promise<void>;
+  notifyWidgetDataChanged?(): Promise<void>;
 }
+
+export type WidgetNativeModule = {
+  saveSnapshot(serializedSnapshot: string): Promise<void>;
+  loadSnapshot(): Promise<string | null>;
+  clearSnapshot(): Promise<void>;
+  requestRefresh(refreshAt: string): Promise<void>;
+  loadRefreshRequest(): Promise<string | null>;
+  clearRefreshRequest(): Promise<void>;
+  notifyWidgetDataChanged?(): Promise<void>;
+};
 
 type KeyValueStorage = {
   setItem(key: string, value: string): Promise<void>;
@@ -23,6 +36,47 @@ type KeyValueStorage = {
 
 const SNAPSHOT_KEY = 'widget:snapshot';
 const REFRESH_AT_KEY = 'widget:refresh-at';
+
+export class NativeWidgetBridge implements WidgetBridge {
+  constructor(private readonly module: WidgetNativeModule) {}
+
+  async saveSnapshot(snapshot: WidgetSnapshot): Promise<void> {
+    await this.module.saveSnapshot(serializeWidgetSnapshot(snapshot));
+  }
+
+  async loadSnapshot(): Promise<WidgetSnapshot | null> {
+    const serialized = await this.module.loadSnapshot();
+    if (!serialized) {
+      return null;
+    }
+
+    return parseWidgetSnapshot(serialized);
+  }
+
+  async clearSnapshot(): Promise<void> {
+    await this.module.clearSnapshot();
+  }
+
+  async requestRefresh(refreshAt: string): Promise<void> {
+    await this.module.requestRefresh(refreshAt);
+  }
+
+  async loadRefreshRequest(): Promise<string | null> {
+    return this.module.loadRefreshRequest();
+  }
+
+  async clearRefreshRequest(): Promise<void> {
+    await this.module.clearRefreshRequest();
+  }
+
+  async notifyWidgetDataChanged(): Promise<void> {
+    if (!this.module.notifyWidgetDataChanged) {
+      return;
+    }
+
+    await this.module.notifyWidgetDataChanged();
+  }
+}
 
 export class AsyncStorageWidgetBridge implements WidgetBridge {
   constructor(
@@ -58,6 +112,10 @@ export class AsyncStorageWidgetBridge implements WidgetBridge {
   async loadRefreshRequest(): Promise<string | null> {
     return this.storage.getItem(this.refreshAtKey);
   }
+
+  async clearRefreshRequest(): Promise<void> {
+    await this.storage.removeItem(this.refreshAtKey);
+  }
 }
 
 export class InMemoryWidgetBridge implements WidgetBridge {
@@ -88,6 +146,10 @@ export class InMemoryWidgetBridge implements WidgetBridge {
 
   async loadRefreshRequest(): Promise<string | null> {
     return this.refreshAt;
+  }
+
+  async clearRefreshRequest(): Promise<void> {
+    this.refreshAt = null;
   }
 }
 
@@ -128,6 +190,7 @@ export const publishTodosToWidget = async (
 
   await bridge.saveSnapshot(snapshot);
   await bridge.requestRefresh(refreshAt);
+  await bridge.notifyWidgetDataChanged?.();
 
   return {
     snapshot,

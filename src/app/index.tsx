@@ -14,7 +14,8 @@ import {
 import { MockOneDriveJoplinSource } from '@/features/sync/mock-onedrive-source';
 import { GraphOneDriveJoplinSource, type OneDriveJoplinSource } from '@/features/sync/onedrive-source';
 import { syncTodosFromOneDriveWithCacheFallback } from '@/features/sync/sync-todos';
-import { AsyncStorageWidgetBridge, publishTodosToWidget } from '@/features/widget/widget-bridge';
+import { publishTodosToWidget } from '@/features/widget/widget-bridge';
+import { createWidgetBridge } from '@/features/widget/widget-bridge-factory';
 import { getWidgetSnapshotState } from '@/features/widget/widget-state';
 import type { TodoItem } from '@/features/todo/types';
 import { AsyncStorageTodoCache } from '@/storage/todo-cache';
@@ -30,7 +31,7 @@ const createSyncSource = (): OneDriveJoplinSource => {
 
 const source = createSyncSource();
 const cache = new AsyncStorageTodoCache();
-const widgetBridge = new AsyncStorageWidgetBridge();
+const widgetBridge = createWidgetBridge();
 
 type SyncStatus = 'idle' | 'syncing' | 'success' | 'error';
 
