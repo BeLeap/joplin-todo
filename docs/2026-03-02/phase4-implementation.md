@@ -28,6 +28,12 @@
    - 기본 갱신 주기(30분)와 분→밀리초 변환 유틸을 추가했습니다.
    - `publishTodosToWidget`에서 다음 갱신 시각(`refreshAt`)을 계산해 브리지로 전달하도록 확장했습니다.
 
+
+6. **위젯 상태 결정 규칙 확정 및 앱 반영**
+   - `src/features/widget/widget-state.ts`
+   - 위젯 상태를 `syncing | ready | empty | error`로 일관되게 계산하는 `getWidgetSnapshotState`를 추가했습니다.
+   - `src/app/index.tsx`에서 동기화 시작/성공/실패 시 위젯 상태를 해당 규칙으로 발행하도록 정리했습니다.
+
 ## 검증
 
 - `npx tsx tests/phase1/phase1-check.ts`

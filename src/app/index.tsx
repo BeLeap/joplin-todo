@@ -15,6 +15,7 @@ import { MockOneDriveJoplinSource } from '@/features/sync/mock-onedrive-source';
 import { GraphOneDriveJoplinSource, type OneDriveJoplinSource } from '@/features/sync/onedrive-source';
 import { syncTodosFromOneDrive } from '@/features/sync/sync-todos';
 import { InMemoryWidgetBridge, publishTodosToWidget } from '@/features/widget/widget-bridge';
+import { getWidgetSnapshotState } from '@/features/widget/widget-state';
 import type { TodoItem } from '@/features/todo/types';
 import { InMemoryTodoCache } from '@/storage/todo-cache';
 
@@ -85,13 +86,17 @@ export default function HomeScreen() {
     setTodos(snapshot.todos);
     setLastSyncedAt(snapshot.lastSyncedAt);
     await publishTodosToWidget(widgetBridge, snapshot.todos, snapshot.lastSyncedAt, {
-      state: snapshot.todos.length > 0 ? 'ready' : 'empty',
+      state: getWidgetSnapshotState(snapshot.todos.length, 'ready'),
     });
   }, []);
 
   const refreshTodos = useCallback(async () => {
     setStatus('syncing');
     setErrorMessage(null);
+
+    await publishTodosToWidget(widgetBridge, todos, lastSyncedAt, {
+      state: getWidgetSnapshotState(todos.length, 'syncing'),
+    });
 
     try {
       const result = await syncTodosFromOneDrive(source, cache, {
@@ -101,7 +106,7 @@ export default function HomeScreen() {
       setTodos(result.todos);
       setLastSyncedAt(result.syncedAt);
       await publishTodosToWidget(widgetBridge, result.todos, result.syncedAt, {
-        state: result.todos.length > 0 ? 'ready' : 'empty',
+        state: getWidgetSnapshotState(result.todos.length, 'ready'),
       });
       setStatus('success');
     } catch (error) {
@@ -115,7 +120,7 @@ export default function HomeScreen() {
       setStatus('error');
       setErrorMessage(friendlyError);
     }
-  }, [loadCachedTodos]);
+  }, [lastSyncedAt, loadCachedTodos, todos]);
 
   useEffect(() => {
     const initialize = async () => {
