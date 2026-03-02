@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 
 import { getWidgetRefreshIntervalMs } from '@/features/widget/widget-refresh-policy';
+import { getWidgetSnapshotState } from '@/features/widget/widget-state';
 import { InMemoryWidgetBridge, publishTodosToWidget } from '@/features/widget/widget-bridge';
 import {
   createWidgetSnapshot,
@@ -42,6 +43,11 @@ const run = async () => {
   assert.deepEqual(parsed, snapshot, '직렬화/역직렬화 시 동일해야 합니다.');
 
   assert.equal(getWidgetRefreshIntervalMs(15), 900000, '분 단위 주기 계산이 맞아야 합니다.');
+
+  assert.equal(getWidgetSnapshotState(3, 'ready'), 'ready');
+  assert.equal(getWidgetSnapshotState(0, 'ready'), 'empty');
+  assert.equal(getWidgetSnapshotState(0, 'syncing'), 'syncing');
+  assert.equal(getWidgetSnapshotState(1, 'error'), 'error');
 
   const bridge = new InMemoryWidgetBridge();
   const published = await publishTodosToWidget(bridge, todos, '2026-03-02T11:00:00.000Z', {
