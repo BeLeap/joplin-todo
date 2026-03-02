@@ -1,10 +1,35 @@
 import assert from 'node:assert/strict';
 
-import { EncryptedJoplinSyncError } from '@/features/sync/errors';
+import { EncryptedJoplinSyncError, OneDriveNetworkError } from '@/features/sync/errors';
 import { normalizeJoplinTodos } from '@/features/sync/joplin-todo-normalizer';
 import { MockOneDriveJoplinSource } from '@/features/sync/mock-onedrive-source';
+import type { OneDriveJoplinSource } from '@/features/sync/onedrive-source';
 import { syncTodosFromOneDrive } from '@/features/sync/sync-todos';
 import { InMemoryTodoCache } from '@/storage/todo-cache';
+
+class FlakySource implements OneDriveJoplinSource {
+  private attempt = 0;
+
+  async listJoplinItems() {
+    this.attempt += 1;
+
+    if (this.attempt === 1) {
+      throw new OneDriveNetworkError('temporary');
+    }
+
+    return [
+      {
+        id: 'todo-retry',
+        title: 'retry success',
+        type_: 13,
+        todo_due: 0,
+        todo_completed: 0,
+        updated_time: Date.now(),
+        encryption_applied: 0,
+      },
+    ];
+  }
+}
 
 const run = async () => {
   const cache = new InMemoryTodoCache();
@@ -34,6 +59,27 @@ const run = async () => {
     EncryptedJoplinSyncError,
     '암호화된 데이터는 예외 처리해야 합니다.',
   );
+
+  const parsed = normalizeJoplinTodos([
+    {
+      id: 'todo-malformed',
+      title: ' ',
+      type_: 13,
+      todo_due: Number.NaN,
+      todo_completed: 1,
+      updated_time: Number.NaN,
+      encryption_applied: 0,
+    },
+  ]);
+  assert.equal(parsed[0]?.title, '(제목 없음)', '빈 제목은 기본 텍스트를 사용해야 합니다.');
+  assert.equal(parsed[0]?.due, null, '비정상 due 값은 null 처리해야 합니다.');
+
+  const flakyCache = new InMemoryTodoCache();
+  const flakyResult = await syncTodosFromOneDrive(new FlakySource(), flakyCache, {
+    maxRetries: 1,
+    retryDelayMs: 1,
+  });
+  assert.equal(flakyResult.todos[0]?.id, 'todo-retry', '네트워크 오류는 재시도 후 성공해야 합니다.');
 
   console.log('Phase 2 checks passed.');
 };
