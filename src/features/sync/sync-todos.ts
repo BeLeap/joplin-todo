@@ -4,7 +4,7 @@ import type { TodoCache } from '@/storage/todo-cache';
 import { OneDriveNetworkError } from './errors';
 import { normalizeJoplinTodos } from './joplin-todo-normalizer';
 import type { OneDriveJoplinSource } from './onedrive-source';
-import type { TodoSyncResult } from './types';
+import type { TodoSyncResult, TodoSyncWithFallbackResult } from './types';
 
 type SyncOptions = {
   maxRetries?: number;
@@ -47,4 +47,34 @@ export const syncTodosFromOneDrive = async (
   }
 
   throw lastError;
+};
+
+export const syncTodosFromOneDriveWithCacheFallback = async (
+  source: OneDriveJoplinSource,
+  cache: TodoCache,
+  options: SyncOptions = {},
+): Promise<TodoSyncWithFallbackResult> => {
+  try {
+    const result = await syncTodosFromOneDrive(source, cache, options);
+    return {
+      ...result,
+      fromCache: false,
+    };
+  } catch (error) {
+    if (!(error instanceof OneDriveNetworkError)) {
+      throw error;
+    }
+
+    const snapshot = await cache.loadTodos();
+    if (snapshot.lastSyncedAt === null) {
+      throw error;
+    }
+
+    return {
+      todos: snapshot.todos,
+      syncedAt: snapshot.lastSyncedAt,
+      source: 'onedrive',
+      fromCache: true,
+    };
+  }
 };

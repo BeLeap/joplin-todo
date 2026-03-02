@@ -4,7 +4,7 @@ import { EncryptedJoplinSyncError, OneDriveNetworkError } from '@/features/sync/
 import { normalizeJoplinTodos } from '@/features/sync/joplin-todo-normalizer';
 import { MockOneDriveJoplinSource } from '@/features/sync/mock-onedrive-source';
 import type { OneDriveJoplinSource } from '@/features/sync/onedrive-source';
-import { syncTodosFromOneDrive } from '@/features/sync/sync-todos';
+import { syncTodosFromOneDrive, syncTodosFromOneDriveWithCacheFallback } from '@/features/sync/sync-todos';
 import { InMemoryTodoCache } from '@/storage/todo-cache';
 
 class FlakySource implements OneDriveJoplinSource {
@@ -28,6 +28,12 @@ class FlakySource implements OneDriveJoplinSource {
         encryption_applied: 0,
       },
     ];
+  }
+}
+
+class AlwaysFailNetworkSource implements OneDriveJoplinSource {
+  async listJoplinItems() {
+    throw new OneDriveNetworkError('offline');
   }
 }
 
@@ -80,6 +86,22 @@ const run = async () => {
     retryDelayMs: 1,
   });
   assert.equal(flakyResult.todos[0]?.id, 'todo-retry', '네트워크 오류는 재시도 후 성공해야 합니다.');
+
+  await flakyCache.saveTodos(flakyResult.todos, flakyResult.syncedAt);
+  const fallbackResult = await syncTodosFromOneDriveWithCacheFallback(
+    new AlwaysFailNetworkSource(),
+    flakyCache,
+    {
+      maxRetries: 0,
+    },
+  );
+  assert.equal(fallbackResult.fromCache, true, '네트워크 실패 시 마지막 성공 캐시를 반환해야 합니다.');
+  assert.equal(fallbackResult.todos[0]?.id, 'todo-retry');
+  assert.equal(
+    fallbackResult.syncedAt,
+    flakyResult.syncedAt,
+    '캐시 fallback 시 마지막 성공 동기화 시각을 유지해야 합니다.',
+  );
 
   console.log('Phase 2 checks passed.');
 };
