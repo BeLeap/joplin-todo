@@ -5,6 +5,7 @@ import { getWidgetSnapshotState } from '@/features/widget/widget-state';
 import {
   AsyncStorageWidgetBridge,
   InMemoryWidgetBridge,
+  NativeWidgetBridge,
   publishTodosToWidget,
 } from '@/features/widget/widget-bridge';
 import {
@@ -12,6 +13,7 @@ import {
   parseWidgetSnapshot,
   serializeWidgetSnapshot,
 } from '@/features/widget/widget-snapshot';
+import { runWidgetRefreshIfDue } from '@/features/widget/widget-refresh-runner';
 import type { TodoItem } from '@/features/todo/types';
 
 
@@ -124,6 +126,10 @@ const run = async () => {
   assert.equal(await bridge.loadSnapshot(), null, 'clear 후 null이어야 합니다.');
   assert.equal(await bridge.loadRefreshRequest(), null, 'clear 후 refreshAt은 null이어야 합니다.');
 
+  await bridge.requestRefresh('2026-03-02T11:30:00.000Z');
+  await bridge.clearRefreshRequest();
+  assert.equal(await bridge.loadRefreshRequest(), null, 'refreshAt만 별도로 clear할 수 있어야 합니다.');
+
 
 
   const storage = new MemoryStorage();
@@ -143,7 +149,113 @@ const run = async () => {
   assert.equal(await storageBridge.loadSnapshot(), null, 'clear 후 스냅샷이 삭제되어야 합니다.');
   assert.equal(await storageBridge.loadRefreshRequest(), null, 'clear 후 refreshAt이 삭제되어야 합니다.');
 
+  const nativeModuleStore = {
+    snapshot: null as string | null,
+    refreshAt: null as string | null,
+    notifyCalled: false,
+  };
+
+  const nativeBridge = new NativeWidgetBridge({
+    async saveSnapshot(serializedSnapshot: string) {
+      nativeModuleStore.snapshot = serializedSnapshot;
+    },
+    async loadSnapshot() {
+      return nativeModuleStore.snapshot;
+    },
+    async clearSnapshot() {
+      nativeModuleStore.snapshot = null;
+      nativeModuleStore.refreshAt = null;
+    },
+    async requestRefresh(refreshAt: string) {
+      nativeModuleStore.refreshAt = refreshAt;
+    },
+    async loadRefreshRequest() {
+      return nativeModuleStore.refreshAt;
+    },
+    async clearRefreshRequest() {
+      nativeModuleStore.refreshAt = null;
+    },
+    async notifyWidgetDataChanged() {
+      nativeModuleStore.notifyCalled = true;
+    },
+  });
+
+  const nativePublished = await publishTodosToWidget(
+    nativeBridge,
+    todos,
+    '2026-03-02T11:40:00.000Z',
+    { state: 'ready' },
+  );
+  assert.equal(nativeModuleStore.notifyCalled, true, '네이티브 브리지에서는 위젯 갱신 알림을 호출해야 합니다.');
+  assert.ok(nativePublished.refreshAt, '네이티브 브리지에서도 refreshAt이 계산되어야 합니다.');
+
+  const dueBridge = new InMemoryWidgetBridge();
+  await dueBridge.requestRefresh('2026-03-02T10:00:00.000Z');
+
+  const result = await runWidgetRefreshIfDue(
+    {
+      async listJoplinItems() {
+        return [
+          {
+            id: 'todo-3',
+            title: 'Run refresh',
+            type_: 13,
+            todo_due: Date.parse('2026-03-03T09:00:00.000Z'),
+            todo_completed: 0,
+            updated_time: Date.parse('2026-03-02T09:00:00.000Z'),
+            encryption_applied: 0,
+          },
+        ];
+      },
+    },
+    new MemoryTodoCache(),
+    dueBridge,
+    { now: new Date('2026-03-02T10:01:00.000Z') },
+  );
+
+  assert.equal(result.status, 'synced', 'refreshAt이 도래한 경우 동기화가 실행되어야 합니다.');
+  const dueSnapshot = await dueBridge.loadSnapshot();
+  assert.equal(dueSnapshot?.todos.length, 1);
+
+  const notDueBridge = new InMemoryWidgetBridge();
+  await notDueBridge.requestRefresh('2026-03-02T11:00:00.000Z');
+  const notDueResult = await runWidgetRefreshIfDue(
+    {
+      async listJoplinItems() {
+        throw new Error('not expected');
+      },
+    },
+    new MemoryTodoCache(),
+    notDueBridge,
+    { now: new Date('2026-03-02T10:30:00.000Z') },
+  );
+  assert.equal(notDueResult.status, 'skipped');
+  assert.equal(notDueResult.reason, 'not-due-yet');
+
   console.log('phase4-check: ok');
 };
+
+class MemoryTodoCache {
+  private todos: TodoItem[] = [];
+
+  private lastSyncedAt: string | null = null;
+
+  async saveTodos(todos: TodoItem[], syncedAt: string) {
+    this.todos = [...todos];
+    this.lastSyncedAt = syncedAt;
+  }
+
+  async loadTodos() {
+    return {
+      todos: [...this.todos],
+      lastSyncedAt: this.lastSyncedAt,
+    };
+  }
+
+  async clear() {
+    this.todos = [];
+    this.lastSyncedAt = null;
+  }
+}
 
 void run();

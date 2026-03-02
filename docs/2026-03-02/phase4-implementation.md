@@ -45,3 +45,10 @@
 - Android Native Module로 `WidgetBridge` 구현체 교체
 - AppWidgetProvider에서 스냅샷 JSON 읽어 RemoteViews 리스트 바인딩
 - 수동 새로고침 액션 및 주기 업데이트 Worker 연결
+
+## 추가 반영 사항 (리뷰 반영)
+
+- [x] `createWidgetBridge`를 `widget-bridge-factory.ts`로 분리해 React Native 런타임 의존을 팩토리 계층으로 한정
+- [x] `WidgetBridge` 인터페이스에 refresh request 조회/초기화 수명주기(`loadRefreshRequest`, `clearRefreshRequest`) 유지
+- [x] `runWidgetRefreshIfDue`를 통해 `refreshAt` 도래 시에만 동기화를 수행하고, 결과를 위젯 스냅샷으로 재발행
+- [x] phase4 체크에 네이티브 브리지 알림 호출 및 due/not-due 실행 케이스 포함
