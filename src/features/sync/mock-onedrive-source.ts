@@ -1,8 +1,5 @@
+import type { OneDriveJoplinSource } from './onedrive-source';
 import type { JoplinRawTodo } from './types';
-
-export interface OneDriveJoplinSource {
-  listJoplinItems(): Promise<JoplinRawTodo[]>;
-}
 
 export class MockOneDriveJoplinSource implements OneDriveJoplinSource {
   async listJoplinItems(): Promise<JoplinRawTodo[]> {

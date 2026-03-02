@@ -6,11 +6,21 @@ import type { JoplinRawTodo } from './types';
 const JOPLIN_TODO_TYPE = 13;
 
 const toIsoOrNull = (value: number): string | null => {
-  if (!value || value <= 0) {
+  if (!Number.isFinite(value) || value <= 0) {
     return null;
   }
 
-  return new Date(value).toISOString();
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+
+  return date.toISOString();
+};
+
+const toIsoOrNow = (value: number): string => {
+  const iso = toIsoOrNull(value);
+  return iso ?? new Date(0).toISOString();
 };
 
 export const normalizeJoplinTodos = (rawItems: JoplinRawTodo[]): TodoItem[] => {
@@ -22,9 +32,9 @@ export const normalizeJoplinTodos = (rawItems: JoplinRawTodo[]): TodoItem[] => {
     .filter((item) => item.type_ === JOPLIN_TODO_TYPE)
     .map((item) => ({
       id: item.id,
-      title: item.title.trim() || '(제목 없음)',
+      title: item.title?.trim() || '(제목 없음)',
       due: toIsoOrNull(item.todo_due),
-      completed: item.todo_completed > 0,
-      updatedTime: new Date(item.updated_time).toISOString(),
+      completed: Number(item.todo_completed) > 0,
+      updatedTime: toIsoOrNow(item.updated_time),
     }));
 };

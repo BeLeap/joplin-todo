@@ -5,14 +5,29 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
-import { EncryptedJoplinSyncError } from '@/features/sync/errors';
+import {
+  EncryptedJoplinSyncError,
+  OneDriveAuthError,
+  OneDriveNetworkError,
+  OneDrivePermissionError,
+} from '@/features/sync/errors';
 import { MockOneDriveJoplinSource } from '@/features/sync/mock-onedrive-source';
+import { GraphOneDriveJoplinSource, type OneDriveJoplinSource } from '@/features/sync/onedrive-source';
 import { syncTodosFromOneDrive } from '@/features/sync/sync-todos';
 import { InMemoryWidgetBridge, publishTodosToWidget } from '@/features/widget/widget-bridge';
 import type { TodoItem } from '@/features/todo/types';
 import { InMemoryTodoCache } from '@/storage/todo-cache';
 
-const source = new MockOneDriveJoplinSource();
+const createSyncSource = (): OneDriveJoplinSource => {
+  const token = process.env.EXPO_PUBLIC_ONEDRIVE_ACCESS_TOKEN;
+  if (token?.trim()) {
+    return new GraphOneDriveJoplinSource(token);
+  }
+
+  return new MockOneDriveJoplinSource();
+};
+
+const source = createSyncSource();
 const cache = new InMemoryTodoCache();
 const widgetBridge = new InMemoryWidgetBridge();
 
@@ -39,6 +54,26 @@ const formatSyncedAtLabel = (syncedAt: string | null) => {
   return new Date(syncedAt).toLocaleString('ko-KR');
 };
 
+const toUserFriendlyError = (error: unknown) => {
+  if (error instanceof EncryptedJoplinSyncError) {
+    return error.message;
+  }
+
+  if (error instanceof OneDriveAuthError) {
+    return error.message;
+  }
+
+  if (error instanceof OneDrivePermissionError) {
+    return error.message;
+  }
+
+  if (error instanceof OneDriveNetworkError) {
+    return `${error.message} 마지막 캐시를 표시합니다.`;
+  }
+
+  return '동기화에 실패했습니다. 마지막 캐시를 표시합니다.';
+};
+
 export default function HomeScreen() {
   const [todos, setTodos] = useState<TodoItem[]>([]);
   const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null);
@@ -57,7 +92,10 @@ export default function HomeScreen() {
     setErrorMessage(null);
 
     try {
-      const result = await syncTodosFromOneDrive(source, cache);
+      const result = await syncTodosFromOneDrive(source, cache, {
+        maxRetries: 2,
+        retryDelayMs: 500,
+      });
       setTodos(result.todos);
       setLastSyncedAt(result.syncedAt);
       await publishTodosToWidget(widgetBridge, result.todos, result.syncedAt);
@@ -65,13 +103,7 @@ export default function HomeScreen() {
     } catch (error) {
       await loadCachedTodos();
       setStatus('error');
-
-      if (error instanceof EncryptedJoplinSyncError) {
-        setErrorMessage(error.message);
-        return;
-      }
-
-      setErrorMessage('동기화에 실패했습니다. 마지막 캐시를 표시합니다.');
+      setErrorMessage(toUserFriendlyError(error));
     }
   }, [loadCachedTodos]);
 
