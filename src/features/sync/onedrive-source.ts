@@ -19,8 +19,21 @@ type GraphListResponse = {
 
 const isJoplinItemFile = (name: string) => name.endsWith('.md');
 
+const parseIntegerField = (value: string | undefined, fallback = 0) => {
+  if (!value) {
+    return fallback;
+  }
+
+  const parsed = Number.parseInt(value, 10);
+  if (!Number.isFinite(parsed)) {
+    return fallback;
+  }
+
+  return parsed;
+};
+
 const parseJoplinMetadata = (content: string): JoplinRawTodo | null => {
-  const lines = content.split(/\r?\n/);
+  const lines = content.replace(/^\uFEFF/, '').split(/\r?\n/);
   const map = new Map<string, string>();
 
   for (const line of lines) {
@@ -48,12 +61,16 @@ const parseJoplinMetadata = (content: string): JoplinRawTodo | null => {
   return {
     id,
     title: map.get('title') ?? '',
-    type_: Number.parseInt(map.get('type_') ?? '0', 10),
-    todo_due: Number.parseInt(map.get('todo_due') ?? '0', 10),
-    todo_completed: Number.parseInt(map.get('todo_completed') ?? '0', 10),
-    updated_time: Number.parseInt(map.get('updated_time') ?? '0', 10),
-    encryption_applied: Number.parseInt(map.get('encryption_applied') ?? '0', 10),
+    type_: parseIntegerField(map.get('type_')),
+    todo_due: parseIntegerField(map.get('todo_due')),
+    todo_completed: parseIntegerField(map.get('todo_completed')),
+    updated_time: parseIntegerField(map.get('updated_time')),
+    encryption_applied: parseIntegerField(map.get('encryption_applied')),
   };
+};
+
+export const __private__ = {
+  parseJoplinMetadata,
 };
 
 const toGraphError = async (response: Response) => {

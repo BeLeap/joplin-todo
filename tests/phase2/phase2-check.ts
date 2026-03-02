@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { EncryptedJoplinSyncError, OneDriveNetworkError } from '@/features/sync/errors';
 import { normalizeJoplinTodos } from '@/features/sync/joplin-todo-normalizer';
 import { MockOneDriveJoplinSource } from '@/features/sync/mock-onedrive-source';
-import type { OneDriveJoplinSource } from '@/features/sync/onedrive-source';
+import { __private__, type OneDriveJoplinSource } from '@/features/sync/onedrive-source';
 import { syncTodosFromOneDrive, syncTodosFromOneDriveWithCacheFallback } from '@/features/sync/sync-todos';
 import { InMemoryTodoCache } from '@/storage/todo-cache';
 
@@ -79,6 +79,24 @@ const run = async () => {
   ]);
   assert.equal(parsed[0]?.title, '(제목 없음)', '빈 제목은 기본 텍스트를 사용해야 합니다.');
   assert.equal(parsed[0]?.due, null, '비정상 due 값은 null 처리해야 합니다.');
+
+
+
+  const parsedFromMetadata = __private__.parseJoplinMetadata(`﻿id: meta-1
+title: Metadata todo
+type_: 13
+todo_due: not-a-number
+todo_completed: 0
+updated_time: 1700000000000
+encryption_applied: 0
+
+Body`);
+  assert.ok(parsedFromMetadata, '메타데이터 파싱 결과가 있어야 합니다.');
+  assert.equal(parsedFromMetadata?.id, 'meta-1');
+  assert.equal(parsedFromMetadata?.todo_due, 0, '잘못된 숫자 필드는 0으로 보정해야 합니다.');
+
+  const missingId = __private__.parseJoplinMetadata('title: no-id\ntype_: 13\n\nBody');
+  assert.equal(missingId, null, 'id가 없는 메타데이터는 무시해야 합니다.');
 
   const flakyCache = new InMemoryTodoCache();
   const flakyResult = await syncTodosFromOneDrive(new FlakySource(), flakyCache, {
