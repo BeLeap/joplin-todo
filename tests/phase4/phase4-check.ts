@@ -27,11 +27,13 @@ const run = async () => {
     },
   ];
 
-  const snapshot = createWidgetSnapshot(todos, '2026-03-02T09:30:00.000Z', 1);
+  const snapshot = createWidgetSnapshot(todos, '2026-03-02T09:30:00.000Z', 1, 'ready');
 
   assert.equal(snapshot.version, 1, '위젯 스냅샷 버전이 1이어야 합니다.');
   assert.equal(snapshot.lastSyncedAt, '2026-03-02T09:30:00.000Z');
   assert.equal(snapshot.todos.length, 1, 'maxItems 제한이 반영되어야 합니다.');
+  assert.equal(snapshot.state, 'ready');
+  assert.equal(snapshot.errorMessage, null);
   assert.equal(snapshot.todos[0]?.id, 'todo-1');
 
   const serialized = serializeWidgetSnapshot(snapshot);
@@ -44,12 +46,14 @@ const run = async () => {
   const bridge = new InMemoryWidgetBridge();
   const published = await publishTodosToWidget(bridge, todos, '2026-03-02T11:00:00.000Z', {
     refreshIntervalMinutes: 15,
+    state: 'ready',
   });
   const loaded = await bridge.loadSnapshot();
 
   assert.ok(loaded, '브리지 저장 후 로드 가능해야 합니다.');
   assert.equal(loaded?.todos.length, 2);
   assert.equal(loaded?.lastSyncedAt, '2026-03-02T11:00:00.000Z');
+  assert.equal(loaded?.state, 'ready');
   assert.deepEqual(loaded, published.snapshot);
 
   const reparsed = parseWidgetSnapshot(published.serializedSnapshot);
@@ -58,6 +62,15 @@ const run = async () => {
   const refreshAt = await bridge.loadRefreshRequest();
   assert.ok(refreshAt, '새로고침 요청 시각이 저장되어야 합니다.');
   assert.equal(typeof published.refreshAt, 'string');
+
+
+
+  const errorPublished = await publishTodosToWidget(bridge, [], '2026-03-02T11:10:00.000Z', {
+    state: 'error',
+    errorMessage: '동기화 실패',
+  });
+  assert.equal(errorPublished.snapshot.state, 'error');
+  assert.equal(errorPublished.snapshot.errorMessage, '동기화 실패');
 
   await bridge.clearSnapshot();
   assert.equal(await bridge.loadSnapshot(), null, 'clear 후 null이어야 합니다.');

@@ -84,7 +84,9 @@ export default function HomeScreen() {
     const snapshot = await cache.loadTodos();
     setTodos(snapshot.todos);
     setLastSyncedAt(snapshot.lastSyncedAt);
-    await publishTodosToWidget(widgetBridge, snapshot.todos, snapshot.lastSyncedAt);
+    await publishTodosToWidget(widgetBridge, snapshot.todos, snapshot.lastSyncedAt, {
+      state: snapshot.todos.length > 0 ? 'ready' : 'empty',
+    });
   }, []);
 
   const refreshTodos = useCallback(async () => {
@@ -98,12 +100,20 @@ export default function HomeScreen() {
       });
       setTodos(result.todos);
       setLastSyncedAt(result.syncedAt);
-      await publishTodosToWidget(widgetBridge, result.todos, result.syncedAt);
+      await publishTodosToWidget(widgetBridge, result.todos, result.syncedAt, {
+        state: result.todos.length > 0 ? 'ready' : 'empty',
+      });
       setStatus('success');
     } catch (error) {
+      const friendlyError = toUserFriendlyError(error);
       await loadCachedTodos();
+      const fallbackSnapshot = await cache.loadTodos();
+      await publishTodosToWidget(widgetBridge, fallbackSnapshot.todos, fallbackSnapshot.lastSyncedAt, {
+        state: 'error',
+        errorMessage: friendlyError,
+      });
       setStatus('error');
-      setErrorMessage(toUserFriendlyError(error));
+      setErrorMessage(friendlyError);
     }
   }, [loadCachedTodos]);
 
