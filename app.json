@@ -39,6 +39,13 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "4aa4130a-dd4b-4db9-bfe7-0dd2c0b96f0f"
+      }
+    },
+    "owner": "b3leap"
   }
 }
