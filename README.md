@@ -1,56 +1,36 @@
-# Welcome to your Expo app 👋
+# Joplin TODO Widget (Expo)
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+Joplin이 OneDrive로 동기화한 TODO를 읽어 앱/위젯에 표시하는 프로젝트입니다.
 
-## Get started
+## 시작하기
 
-1. Install dependencies
+1. 의존성 설치
 
    ```bash
    npm install
    ```
 
-2. Start the app
+2. (선택) OneDrive OAuth 설정
+
+   Microsoft Entra App 등록 후, 아래 환경 변수를 설정하세요.
+
+   ```bash
+   EXPO_PUBLIC_ONEDRIVE_CLIENT_ID=<your-client-id>
+   ```
+
+   - Redirect URI: `joplintodo://auth`
+   - 권한(scope): `Files.Read offline_access openid profile`
+
+   > 참고: 개발 편의상 `EXPO_PUBLIC_ONEDRIVE_ACCESS_TOKEN`을 직접 넣는 방식도 유지됩니다.
+
+3. 앱 실행
 
    ```bash
    npx expo start
    ```
 
-In the output, you'll find options to open the app in a
+## 동작 요약
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
-
-```bash
-npm run reset-project
-```
-
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
-
-### Other setup steps
-
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
-
-## Learn more
-
-To learn more about developing your project with Expo, look at the following resources:
-
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
-
-## Join the community
-
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+- 앱 첫 화면에서 OneDrive 로그인 버튼으로 OAuth 인증을 수행합니다.
+- 인증 후 Microsoft Graph API로 `/me/drive/special/approot:/Joplin:/children`를 조회해 `.md` 동기화 파일을 읽습니다.
+- Joplin 메타데이터를 파싱해 TODO만 추출하고 캐시에 저장합니다.

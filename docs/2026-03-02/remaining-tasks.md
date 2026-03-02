@@ -5,9 +5,9 @@
 ## 1) 우선순위 높음 (MVP 완료 필수)
 
 - [ ] **실제 OneDrive 연동 구현**
-  - [ ] OAuth 로그인 플로우 연결 (시스템/내장 브라우저)
-  - [ ] OneDrive 내 Joplin 동기화 파일 목록 조회
-  - [ ] Mock 소스(`MockOneDriveJoplinSource`)를 실소스 구현체로 교체
+  - [x] OAuth 로그인 플로우 연결 (시스템/내장 브라우저)
+  - [x] OneDrive 내 Joplin 동기화 파일 목록 조회
+  - [x] Mock 소스(`MockOneDriveJoplinSource`)를 실소스 구현체로 교체
   - [ ] 비암호화 실계정에서 TODO 로딩 성공 확인
 
 - [x] **Joplin 실데이터 파싱 고도화**
