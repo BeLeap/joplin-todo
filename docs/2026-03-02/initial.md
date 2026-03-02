@@ -1,0 +1,2 @@
+- Joplin OneDrive Sync 호환
+- TODO list를 위젯으로 보여주는 Application
