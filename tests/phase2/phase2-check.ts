@@ -3,8 +3,14 @@ import assert from 'node:assert/strict';
 import { EncryptedJoplinSyncError, OneDriveNetworkError } from '@/features/sync/errors';
 import { normalizeJoplinTodos } from '@/features/sync/joplin-todo-normalizer';
 import { MockOneDriveJoplinSource } from '@/features/sync/mock-onedrive-source';
-import { GraphOneDriveJoplinSource, __private__, type OneDriveJoplinSource } from '@/features/sync/onedrive-source';
+import {
+  GraphOneDriveJoplinSource,
+  __private__,
+  type OneDriveJoplinSource,
+  type OneDriveSyncProgress,
+} from '@/features/sync/onedrive-source';
 import { syncTodosFromOneDrive, syncTodosFromOneDriveWithCacheFallback } from '@/features/sync/sync-todos';
+import type { JoplinRawTodo } from '@/features/sync/types';
 import { InMemoryTodoCache } from '@/storage/todo-cache';
 
 class FlakySource implements OneDriveJoplinSource {
@@ -33,7 +39,9 @@ class FlakySource implements OneDriveJoplinSource {
 }
 
 class AlwaysFailNetworkSource implements OneDriveJoplinSource {
-  async listJoplinItems() {
+  async listJoplinItems(
+    _onProgress?: (progress: OneDriveSyncProgress) => void,
+  ): Promise<JoplinRawTodo[]> {
     throw new OneDriveNetworkError('offline');
   }
 }
@@ -153,7 +161,12 @@ Body`);
   const originalFetch = globalThis.fetch;
   let graphAttempt = 0;
   globalThis.fetch = (async (input) => {
-    const requestUrl = typeof input === 'string' ? input : input.url;
+    const requestUrl =
+      typeof input === 'string'
+        ? input
+        : input instanceof URL
+          ? input.toString()
+          : input.url;
     graphAttempt += 1;
 
     if (graphAttempt === 1) {
