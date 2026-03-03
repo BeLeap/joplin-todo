@@ -168,8 +168,17 @@ export const useOneDriveAuth = () => {
     }
 
     const result = await promptAsync();
+    if (result.type === 'error') {
+      const oauthErrorCode = result.error?.code ?? result.params.error ?? result.errorCode ?? 'unknown_error';
+      const oauthErrorDescription = result.error?.description ?? result.params.error_description;
+      const oauthErrorMessage = oauthErrorDescription
+        ? `OneDrive OAuth 오류 (${oauthErrorCode}): ${oauthErrorDescription}`
+        : `OneDrive OAuth 오류 (${oauthErrorCode})`;
+      throw new OneDriveAuthError(oauthErrorMessage);
+    }
+
     if (result.type !== 'success') {
-      throw new OneDriveAuthError('OneDrive 로그인에 실패했습니다. 다시 시도해 주세요.');
+      throw new OneDriveAuthError(`OneDrive 로그인에 실패했습니다. (${result.type})`);
     }
 
     const code = result.params.code;
