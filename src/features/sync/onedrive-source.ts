@@ -3,7 +3,7 @@ import type { JoplinRawTodo } from './types';
 import { OneDriveAuthError, OneDriveNetworkError, OneDrivePermissionError } from './errors';
 
 const GRAPH_BASE_URL = 'https://graph.microsoft.com/v1.0';
-const JOPLIN_FOLDER_PATH = '/me/drive/special/approot:/Joplin';
+const JOPLIN_FOLDER_PATH = '/me/drive/special/approot:/Apps/Joplin';
 const JOPLIN_SYNC_PAGE_SIZE = 200;
 
 type GraphDriveItem = {
