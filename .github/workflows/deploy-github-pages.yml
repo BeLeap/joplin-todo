@@ -1,4 +1,4 @@
-name: Deploy Privacy Policy to GitHub Pages
+name: Deploy GitHub Pages
 
 on:
   push:
@@ -7,7 +7,7 @@ on:
       - master
     paths:
       - "github-pages/**"
-      - ".github/workflows/deploy-privacy-policy.yml"
+      - ".github/workflows/deploy-github-pages.yml"
   workflow_dispatch:
 
 permissions:
