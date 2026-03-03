@@ -53,5 +53,5 @@ npx eas build --platform ios
 ## 동작 요약
 
 - 앱 첫 화면에서 OneDrive 로그인 버튼으로 OAuth 인증을 수행합니다.
-- 인증 후 Microsoft Graph API로 `/me/drive/special/approot:/Joplin:/children`를 조회해 `.md` 동기화 파일을 읽습니다.
+- 인증 후 Microsoft Graph API로 `/me/drive/root:/Apps/Joplin:/children`를 조회해 `.md` 동기화 파일을 읽습니다.
 - Joplin 메타데이터를 파싱해 TODO만 추출하고 캐시에 저장합니다.

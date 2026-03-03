@@ -3,7 +3,7 @@ import type { JoplinRawTodo } from './types';
 import { OneDriveAuthError, OneDriveNetworkError, OneDrivePermissionError } from './errors';
 
 const GRAPH_BASE_URL = 'https://graph.microsoft.com/v1.0';
-const JOPLIN_FOLDER_PATH = '/me/drive/special/approot:/Apps/Joplin';
+const JOPLIN_FOLDER_PATH = '/me/drive/root:/Apps/Joplin';
 const JOPLIN_SYNC_PAGE_SIZE = 200;
 
 type GraphDriveItem = {
@@ -73,17 +73,80 @@ export const __private__ = {
   parseJoplinMetadata,
 };
 
-const toGraphError = async (response: Response) => {
+type GraphRequestContext = {
+  logicalPath?: string;
+  operation: string;
+  requestUrl: string;
+};
+
+type GraphErrorBody = {
+  error?: {
+    code?: string;
+    message?: string;
+    innerError?: {
+      code?: string;
+      'request-id'?: string;
+      date?: string;
+    };
+    innererror?: {
+      code?: string;
+      'request-id'?: string;
+      date?: string;
+    };
+  };
+};
+
+const buildErrorDetail = (context: GraphRequestContext, parts: (string | null | undefined)[]) =>
+  [
+    `operation=${context.operation}`,
+    `requestUrl=${context.requestUrl}`,
+    context.logicalPath ? `logicalPath=${context.logicalPath}` : null,
+    ...parts,
+  ]
+    .filter(Boolean)
+    .join(' | ');
+
+const toGraphError = async (response: Response, context: GraphRequestContext) => {
+  const rawBody = await response.text();
+  let graphCode: string | undefined;
+  let graphMessage: string | undefined;
+  let graphInnerCode: string | undefined;
+  let graphRequestId: string | undefined;
+  let graphDate: string | undefined;
+
+  try {
+    const parsed = JSON.parse(rawBody) as GraphErrorBody;
+    const innerError = parsed.error?.innerError ?? parsed.error?.innererror;
+    graphCode = parsed.error?.code;
+    graphMessage = parsed.error?.message;
+    graphInnerCode = innerError?.code;
+    graphRequestId = innerError?.['request-id'];
+    graphDate = innerError?.date;
+  } catch {
+    // Graph가 JSON이 아닌 에러 본문을 돌려줄 수 있어 무시하고 rawBody를 그대로 보존합니다.
+  }
+
+  const retryAfter = response.headers.get('retry-after');
+  const detail = buildErrorDetail(context, [
+    `httpStatus=${response.status}${response.statusText ? ` ${response.statusText}` : ''}`,
+    graphCode ? `graphCode=${graphCode}` : null,
+    graphMessage ? `graphMessage=${graphMessage}` : null,
+    graphInnerCode ? `graphInnerCode=${graphInnerCode}` : null,
+    graphRequestId ? `graphRequestId=${graphRequestId}` : null,
+    graphDate ? `graphDate=${graphDate}` : null,
+    retryAfter ? `retryAfter=${retryAfter}` : null,
+    `response=${rawBody.slice(0, 300)}`,
+  ]);
+
   if (response.status === 401) {
-    return new OneDriveAuthError();
+    return new OneDriveAuthError(undefined, detail);
   }
 
   if (response.status === 403) {
-    return new OneDrivePermissionError();
+    return new OneDrivePermissionError(undefined, detail);
   }
 
-  const body = await response.text();
-  return new OneDriveNetworkError(`OneDrive 요청 실패 (${response.status}): ${body.slice(0, 200)}`);
+  return new OneDriveNetworkError(`OneDrive 요청 실패 | ${detail}`);
 };
 
 export interface OneDriveJoplinSource {
@@ -93,15 +156,22 @@ export interface OneDriveJoplinSource {
 export class GraphOneDriveJoplinSource implements OneDriveJoplinSource {
   constructor(private readonly accessToken: string) {}
 
-  private async graphFetch(url: string) {
-    const response = await fetch(url, {
-      headers: {
-        Authorization: `Bearer ${this.accessToken}`,
-      },
-    });
+  private async graphFetch(url: string, context: Omit<GraphRequestContext, 'requestUrl'>) {
+    let response: Response;
+    try {
+      response = await fetch(url, {
+        headers: {
+          Authorization: `Bearer ${this.accessToken}`,
+        },
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      const detail = buildErrorDetail({ ...context, requestUrl: url }, [`reason=${message}`]);
+      throw new OneDriveNetworkError(`OneDrive 요청 중 네트워크 예외 발생 | ${detail}`);
+    }
 
     if (!response.ok) {
-      throw await toGraphError(response);
+      throw await toGraphError(response, { ...context, requestUrl: url });
     }
 
     return response;
@@ -112,7 +182,10 @@ export class GraphOneDriveJoplinSource implements OneDriveJoplinSource {
     let nextLink = `${GRAPH_BASE_URL}${JOPLIN_FOLDER_PATH}:/children?$top=${JOPLIN_SYNC_PAGE_SIZE}`;
 
     while (nextLink) {
-      const response = await this.graphFetch(nextLink);
+      const response = await this.graphFetch(nextLink, {
+        operation: 'list-joplin-files',
+        logicalPath: `${JOPLIN_FOLDER_PATH}:/children`,
+      });
       const body = (await response.json()) as GraphListResponse;
       const page = body.value?.filter((item) => item.file && isJoplinItemFile(item.name)) ?? [];
       files.push(...page);
@@ -127,7 +200,11 @@ export class GraphOneDriveJoplinSource implements OneDriveJoplinSource {
 
     const rawItems = await Promise.all(
       files.map(async (file) => {
-        const response = await this.graphFetch(`${GRAPH_BASE_URL}/me/drive/items/${file.id}/content`);
+        const contentUrl = `${GRAPH_BASE_URL}/me/drive/items/${file.id}/content`;
+        const response = await this.graphFetch(contentUrl, {
+          operation: 'download-joplin-item',
+          logicalPath: `${JOPLIN_FOLDER_PATH}/${file.name}`,
+        });
         const content = await response.text();
         return parseJoplinMetadata(content);
       }),
