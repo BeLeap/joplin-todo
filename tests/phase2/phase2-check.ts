@@ -21,7 +21,8 @@ class FlakySource implements OneDriveJoplinSource {
       {
         id: 'todo-retry',
         title: 'retry success',
-        type_: 13,
+        type_: 1,
+        is_todo: 1,
         todo_due: 0,
         todo_completed: 0,
         updated_time: Date.now(),
@@ -70,7 +71,8 @@ const run = async () => {
     {
       id: 'todo-malformed',
       title: ' ',
-      type_: 13,
+      type_: 1,
+      is_todo: 1,
       todo_due: Number.NaN,
       todo_completed: 1,
       updated_time: Number.NaN,
@@ -95,9 +97,10 @@ const run = async () => {
 
 
 
-  const parsedFromMetadata = __private__.parseJoplinMetadata(`﻿id: meta-1
-title: Metadata todo
-type_: 13
+  const parsedFromMetadata = __private__.parseJoplinMetadata(`Hello, World!
+id: meta-1
+parent_id: root
+is_todo: 1
 todo_due: not-a-number
 todo_completed: 0
 updated_time: 1700000000000
@@ -106,6 +109,7 @@ encryption_applied: 0
 Body`);
   assert.ok(parsedFromMetadata, '메타데이터 파싱 결과가 있어야 합니다.');
   assert.equal(parsedFromMetadata?.id, 'meta-1');
+  assert.equal(parsedFromMetadata?.title, 'Hello, World!', '첫 줄을 제목으로 파싱해야 합니다.');
   assert.equal(parsedFromMetadata?.todo_due, 0, '잘못된 숫자 필드는 0으로 보정해야 합니다.');
 
   const parsedTodoFlagMetadata = __private__.parseJoplinMetadata(`id: meta-flag-1
@@ -161,9 +165,10 @@ Body`);
 
     if (requestUrl.endsWith('/content')) {
       return new Response(
-        `id: todo-graph
-title: from graph
-type_: 13
+        `from graph
+id: todo-graph
+type_: 1
+is_todo: 1
 todo_due: 0
 todo_completed: 0
 updated_time: 1700000000000
