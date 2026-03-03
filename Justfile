@@ -1,8 +1,10 @@
 dev-build:
     npx expo run:android
-eas-dev-build:
+remote-dev-build:
     npx eas-cli@latest build --platform android --profile development
-eas-build:
+remote-build:
     npx eas-cli@latest build --platform android
-eas-submit:
+local-build:
+    npx eas-cli@latest build --platform android --local
+remote-submit:
     npx eas-cli@latest submit --platform android --latest
