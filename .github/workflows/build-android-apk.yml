@@ -25,19 +25,18 @@ jobs:
           distribution: temurin
           java-version: 17
 
+      - name: Install just
+        uses: taiki-e/install-action@just
+
       - name: Install dependencies
         run: npm ci
 
-      - name: Generate native Android project
-        run: npx expo prebuild --platform android --non-interactive
-
-      - name: Build release APK
-        working-directory: android
-        run: ./gradlew assembleRelease
+      - name: Build release APK via just
+        run: just local-apk-build
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: app-release-apk
-          path: android/app/build/outputs/apk/release/app-release.apk
+          path: app-release.apk
           if-no-files-found: error
