@@ -1,9 +1,9 @@
-import type { OneDriveJoplinSource } from './onedrive-source';
+import type { OneDriveJoplinSource, OneDriveSyncProgress } from './onedrive-source';
 import type { JoplinRawTodo } from './types';
 
 export class MockOneDriveJoplinSource implements OneDriveJoplinSource {
-  async listJoplinItems(): Promise<JoplinRawTodo[]> {
-    return [
+  async listJoplinItems(onProgress?: (progress: OneDriveSyncProgress) => void): Promise<JoplinRawTodo[]> {
+    const items = [
       {
         id: 'todo-1',
         title: 'Pay rent',
@@ -32,5 +32,16 @@ export class MockOneDriveJoplinSource implements OneDriveJoplinSource {
         encryption_applied: 0,
       },
     ];
+
+    items.forEach((item, index) => {
+      onProgress?.({
+        phase: 'downloading',
+        currentFileName: `${item.id}.md`,
+        completed: index + 1,
+        total: items.length,
+      });
+    });
+
+    return items;
   }
 }

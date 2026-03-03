@@ -11,7 +11,11 @@ import {
   OneDriveNetworkError,
   OneDrivePermissionError,
 } from '@/features/sync/errors';
-import { GraphOneDriveJoplinSource, type OneDriveJoplinSource } from '@/features/sync/onedrive-source';
+import {
+  GraphOneDriveJoplinSource,
+  type OneDriveJoplinSource,
+  type OneDriveSyncProgress,
+} from '@/features/sync/onedrive-source';
 import { useOneDriveAuth } from '@/features/sync/use-onedrive-auth';
 import { syncTodosFromOneDriveWithCacheFallback } from '@/features/sync/sync-todos';
 import { publishTodosToWidget } from '@/features/widget/widget-bridge';
@@ -74,6 +78,7 @@ export default function HomeScreen() {
   const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null);
   const [status, setStatus] = useState<SyncStatus>('idle');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [syncProgress, setSyncProgress] = useState<OneDriveSyncProgress | null>(null);
 
   const loadCachedTodos = useCallback(async () => {
     const snapshot = await cache.loadTodos();
@@ -97,6 +102,7 @@ export default function HomeScreen() {
 
     setStatus('syncing');
     setErrorMessage(null);
+    setSyncProgress(null);
 
     await publishTodosToWidget(widgetBridge, todos, lastSyncedAt, {
       state: getWidgetSnapshotState(todos.length, 'syncing'),
@@ -107,6 +113,7 @@ export default function HomeScreen() {
       const result = await syncTodosFromOneDriveWithCacheFallback(source, cache, {
         maxRetries: 2,
         retryDelayMs: 500,
+        onProgress: (progress) => setSyncProgress(progress),
       });
       setTodos(result.todos);
       setLastSyncedAt(result.syncedAt);
@@ -119,6 +126,7 @@ export default function HomeScreen() {
       });
       setStatus(result.fromCache ? 'error' : 'success');
       setErrorMessage(friendlyError);
+      setSyncProgress(null);
     } catch (error) {
       const friendlyError = toUserFriendlyError(error);
       await loadCachedTodos();
@@ -129,6 +137,7 @@ export default function HomeScreen() {
       });
       setStatus('error');
       setErrorMessage(friendlyError);
+      setSyncProgress(null);
     }
   }, [getValidAccessToken, lastSyncedAt, loadCachedTodos, todos]);
 
@@ -163,8 +172,16 @@ export default function HomeScreen() {
 
   const statusMessage = useMemo(() => {
     switch (status) {
-      case 'syncing':
-        return '동기화 중...';
+      case 'syncing': {
+        if (!syncProgress) {
+          return '동기화 중...';
+        }
+
+        const { completed, total, currentFileName } = syncProgress;
+        const progressLabel = `(${Math.min(completed, total)}/${total})`;
+        const fileLabel = currentFileName ? ` ${currentFileName}` : '';
+        return `동기화 중... ${progressLabel}${fileLabel}`;
+      }
       case 'success':
         return 'OneDrive 동기화 성공';
       case 'error':
@@ -172,7 +189,7 @@ export default function HomeScreen() {
       default:
         return '대기 중';
     }
-  }, [status]);
+  }, [status, syncProgress]);
 
   return (
     <ThemedView style={styles.container}>

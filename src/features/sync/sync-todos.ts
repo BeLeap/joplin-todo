@@ -3,12 +3,13 @@ import type { TodoCache } from '@/storage/todo-cache';
 
 import { OneDriveNetworkError } from './errors';
 import { normalizeJoplinTodos } from './joplin-todo-normalizer';
-import type { OneDriveJoplinSource } from './onedrive-source';
+import type { OneDriveJoplinSource, OneDriveSyncProgress } from './onedrive-source';
 import type { TodoSyncResult, TodoSyncWithFallbackResult } from './types';
 
 type SyncOptions = {
   maxRetries?: number;
   retryDelayMs?: number;
+  onProgress?: (progress: OneDriveSyncProgress) => void;
 };
 
 const sleep = async (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -24,7 +25,7 @@ export const syncTodosFromOneDrive = async (
   let lastError: unknown;
   for (let attempt = 0; attempt <= maxRetries; attempt += 1) {
     try {
-      const rawItems = await source.listJoplinItems();
+      const rawItems = await source.listJoplinItems(options.onProgress);
       const normalizedTodos = normalizeJoplinTodos(rawItems);
       const sortedTodos = sortTodosByDueDate(normalizedTodos);
       const syncedAt = new Date().toISOString();
