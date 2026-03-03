@@ -150,8 +150,15 @@ const toGraphError = async (response: Response, context: GraphRequestContext) =>
 };
 
 export interface OneDriveJoplinSource {
-  listJoplinItems(): Promise<JoplinRawTodo[]>;
+  listJoplinItems(onProgress?: (progress: OneDriveSyncProgress) => void): Promise<JoplinRawTodo[]>;
 }
+
+export type OneDriveSyncProgress = {
+  phase: 'listing' | 'downloading';
+  currentFileName: string | null;
+  completed: number;
+  total: number;
+};
 
 export class GraphOneDriveJoplinSource implements OneDriveJoplinSource {
   constructor(private readonly accessToken: string) {}
@@ -195,20 +202,39 @@ export class GraphOneDriveJoplinSource implements OneDriveJoplinSource {
     return files;
   }
 
-  async listJoplinItems(): Promise<JoplinRawTodo[]> {
+  async listJoplinItems(onProgress?: (progress: OneDriveSyncProgress) => void): Promise<JoplinRawTodo[]> {
     const files = await this.listJoplinFiles();
+    onProgress?.({
+      phase: 'downloading',
+      currentFileName: null,
+      completed: 0,
+      total: files.length,
+    });
 
-    const rawItems = await Promise.all(
-      files.map(async (file) => {
-        const contentUrl = `${GRAPH_BASE_URL}/me/drive/items/${file.id}/content`;
-        const response = await this.graphFetch(contentUrl, {
-          operation: 'download-joplin-item',
-          logicalPath: `${JOPLIN_FOLDER_PATH}/${file.name}`,
-        });
-        const content = await response.text();
-        return parseJoplinMetadata(content);
-      }),
-    );
+    const rawItems: (JoplinRawTodo | null)[] = [];
+    for (const [index, file] of files.entries()) {
+      onProgress?.({
+        phase: 'downloading',
+        currentFileName: file.name,
+        completed: index,
+        total: files.length,
+      });
+
+      const contentUrl = `${GRAPH_BASE_URL}/me/drive/items/${file.id}/content`;
+      const response = await this.graphFetch(contentUrl, {
+        operation: 'download-joplin-item',
+        logicalPath: `${JOPLIN_FOLDER_PATH}/${file.name}`,
+      });
+      const content = await response.text();
+      rawItems.push(parseJoplinMetadata(content));
+
+      onProgress?.({
+        phase: 'downloading',
+        currentFileName: file.name,
+        completed: index + 1,
+        total: files.length,
+      });
+    }
 
     return rawItems.filter((item): item is JoplinRawTodo => item !== null);
   }
