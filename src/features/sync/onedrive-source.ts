@@ -36,10 +36,30 @@ const parseIntegerField = (value: string | undefined, fallback = 0) => {
 };
 
 const parseJoplinMetadata = (content: string): JoplinRawTodo | null => {
-  const lines = content.replace(/^\uFEFF/, '').split(/\r?\n/);
+  const normalizedContent = content.charCodeAt(0) === 0xfeff ? content.slice(1) : content;
+  const lines = normalizedContent.replace(/\r/g, '').split('\n');
   const map = new Map<string, string>();
 
-  for (const line of lines) {
+  let titleFromFirstLine = '';
+  let metadataLines = lines;
+
+  const firstLine = lines[0]?.trim() ?? '';
+  const embeddedIdIndex = firstLine.indexOf('id:');
+  if (embeddedIdIndex > 0) {
+    titleFromFirstLine = firstLine.slice(0, embeddedIdIndex).trim();
+    metadataLines = [firstLine.slice(embeddedIdIndex), ...lines.slice(1)];
+  } else {
+    const separator = firstLine.indexOf(':');
+    const firstLineLooksLikeMetadata =
+      separator > 0 && /^[a-zA-Z0-9_]+$/.test(firstLine.slice(0, separator).trim());
+
+    if (!firstLineLooksLikeMetadata) {
+      titleFromFirstLine = firstLine;
+      metadataLines = lines.slice(1);
+    }
+  }
+
+  for (const line of metadataLines) {
     if (!line.trim()) {
       break;
     }
@@ -63,8 +83,9 @@ const parseJoplinMetadata = (content: string): JoplinRawTodo | null => {
 
   return {
     id,
-    title: map.get('title') ?? '',
+    title: titleFromFirstLine || map.get('title') || '',
     type_: parseIntegerField(map.get('type_')),
+    is_todo: parseIntegerField(map.get('is_todo')),
     todo_due: parseIntegerField(map.get('todo_due')),
     todo_completed: parseIntegerField(map.get('todo_completed')),
     updated_time: parseIntegerField(map.get('updated_time')),
