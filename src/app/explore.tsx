@@ -88,18 +88,6 @@ export default function TabTwoScreen() {
             </ThemedView>
           </Collapsible>
 
-          <Collapsible title="Images">
-            <ThemedText type="small">
-              For static images, you can use the <ThemedText type="code">@2x</ThemedText> and{' '}
-              <ThemedText type="code">@3x</ThemedText> suffixes to provide files for different
-              screen densities.
-            </ThemedText>
-            <Image source={require('@/assets/images/react-logo.png')} style={styles.imageReact} />
-            <ExternalLink href="https://reactnative.dev/docs/images">
-              <ThemedText type="linkPrimary">Learn more</ThemedText>
-            </ExternalLink>
-          </Collapsible>
-
           <Collapsible title="Light and dark mode components">
             <ThemedText type="small">
               This template has light and dark mode support. The{' '}
@@ -172,10 +160,5 @@ const styles = StyleSheet.create({
     aspectRatio: 296 / 171,
     borderRadius: Spacing.three,
     marginTop: Spacing.two,
-  },
-  imageReact: {
-    width: 100,
-    height: 100,
-    alignSelf: 'center',
   },
 });
