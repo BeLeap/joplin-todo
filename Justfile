@@ -5,4 +5,4 @@ eas-dev-build:
 eas-build:
     npx eas-cli@latest build --platform android
 eas-submit:
-    npx eas-cli@latest submit --platform android
+    npx eas-cli@latest submit --platform android --latest
