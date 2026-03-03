@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { EncryptedJoplinSyncError, OneDriveNetworkError } from '@/features/sync/errors';
 import { normalizeJoplinTodos } from '@/features/sync/joplin-todo-normalizer';
 import { MockOneDriveJoplinSource } from '@/features/sync/mock-onedrive-source';
-import { __private__, type OneDriveJoplinSource } from '@/features/sync/onedrive-source';
+import { GraphOneDriveJoplinSource, __private__, type OneDriveJoplinSource } from '@/features/sync/onedrive-source';
 import { syncTodosFromOneDrive, syncTodosFromOneDriveWithCacheFallback } from '@/features/sync/sync-todos';
 import { InMemoryTodoCache } from '@/storage/todo-cache';
 
@@ -120,6 +120,64 @@ Body`);
     flakyResult.syncedAt,
     '캐시 fallback 시 마지막 성공 동기화 시각을 유지해야 합니다.',
   );
+
+  const originalFetch = globalThis.fetch;
+  let graphAttempt = 0;
+  globalThis.fetch = (async (input) => {
+    const requestUrl = typeof input === 'string' ? input : input.url;
+    graphAttempt += 1;
+
+    if (graphAttempt === 1) {
+      return new Response(JSON.stringify({ error: { code: 'tooManyRequests' } }), {
+        status: 429,
+        headers: { 'content-type': 'application/json' },
+      });
+    }
+
+    if (requestUrl.endsWith('/content')) {
+      return new Response(
+        `id: todo-graph
+title: from graph
+type_: 13
+todo_due: 0
+todo_completed: 0
+updated_time: 1700000000000
+encryption_applied: 0
+
+Body`,
+        {
+          status: 200,
+          headers: { 'content-type': 'text/plain' },
+        },
+      );
+    }
+
+    return new Response(
+      JSON.stringify({
+        value: [
+          {
+            id: 'item-1',
+            name: 'todo.md',
+            file: {},
+          },
+        ],
+      }),
+      {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      },
+    );
+  }) as typeof fetch;
+
+  const graphSource = new GraphOneDriveJoplinSource('fake-token', {
+    maxRetries: 1,
+    baseDelayMs: 1,
+  });
+  const graphItems = await graphSource.listJoplinItems();
+  assert.equal(graphAttempt, 3, '429 응답은 지수 백오프로 재시도 후 성공해야 합니다.');
+  assert.equal(graphItems.length, 1);
+
+  globalThis.fetch = originalFetch;
 
   console.log('Phase 2 checks passed.');
 };

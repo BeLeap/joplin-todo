@@ -5,6 +5,9 @@ import { OneDriveAuthError, OneDriveNetworkError, OneDrivePermissionError } from
 const GRAPH_BASE_URL = 'https://graph.microsoft.com/v1.0';
 const JOPLIN_FOLDER_PATH = '/me/drive/root:/Apps/Joplin';
 const JOPLIN_SYNC_PAGE_SIZE = 200;
+const GRAPH_RETRYABLE_HTTP_STATUS = new Set([408, 429, 500, 502, 503, 504]);
+const DEFAULT_GRAPH_MAX_RETRIES = 3;
+const DEFAULT_GRAPH_RETRY_BASE_DELAY_MS = 300;
 
 type GraphDriveItem = {
   id: string;
@@ -161,27 +164,68 @@ export type OneDriveSyncProgress = {
 };
 
 export class GraphOneDriveJoplinSource implements OneDriveJoplinSource {
-  constructor(private readonly accessToken: string) {}
+  constructor(
+    private readonly accessToken: string,
+    private readonly retryOptions: {
+      maxRetries?: number;
+      baseDelayMs?: number;
+    } = {},
+  ) {}
 
-  private async graphFetch(url: string, context: Omit<GraphRequestContext, 'requestUrl'>) {
-    let response: Response;
-    try {
-      response = await fetch(url, {
-        headers: {
-          Authorization: `Bearer ${this.accessToken}`,
-        },
-      });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      const detail = buildErrorDetail({ ...context, requestUrl: url }, [`reason=${message}`]);
-      throw new OneDriveNetworkError(`OneDrive 요청 중 네트워크 예외 발생 | ${detail}`);
+  private sleep(ms: number) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  private getRetryDelayMs(attempt: number, retryAfterHeader: string | null) {
+    if (retryAfterHeader) {
+      const seconds = Number.parseInt(retryAfterHeader, 10);
+      if (Number.isFinite(seconds) && seconds >= 0) {
+        return seconds * 1000;
+      }
     }
 
-    if (!response.ok) {
+    const baseDelayMs = this.retryOptions.baseDelayMs ?? DEFAULT_GRAPH_RETRY_BASE_DELAY_MS;
+    return baseDelayMs * 2 ** attempt;
+  }
+
+  private async graphFetch(url: string, context: Omit<GraphRequestContext, 'requestUrl'>) {
+    const maxRetries = this.retryOptions.maxRetries ?? DEFAULT_GRAPH_MAX_RETRIES;
+
+    for (let attempt = 0; attempt <= maxRetries; attempt += 1) {
+      let response: Response;
+      try {
+        response = await fetch(url, {
+          headers: {
+            Authorization: `Bearer ${this.accessToken}`,
+          },
+        });
+      } catch (error) {
+        if (attempt >= maxRetries) {
+          const message = error instanceof Error ? error.message : String(error);
+          const detail = buildErrorDetail({ ...context, requestUrl: url }, [`reason=${message}`]);
+          throw new OneDriveNetworkError(`OneDrive 요청 중 네트워크 예외 발생 | ${detail}`);
+        }
+
+        await this.sleep(this.getRetryDelayMs(attempt, null));
+        continue;
+      }
+
+      if (response.ok) {
+        return response;
+      }
+
+      const isRetryableStatus = GRAPH_RETRYABLE_HTTP_STATUS.has(response.status);
+      if (isRetryableStatus && attempt < maxRetries) {
+        await this.sleep(this.getRetryDelayMs(attempt, response.headers.get('retry-after')));
+        continue;
+      }
+
       throw await toGraphError(response, { ...context, requestUrl: url });
     }
 
-    return response;
+    throw new OneDriveNetworkError(
+      `OneDrive 요청 실패 | ${buildErrorDetail({ ...context, requestUrl: url }, ['reason=retry-exhausted'])}`,
+    );
   }
 
   private async listJoplinFiles() {
