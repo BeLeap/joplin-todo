@@ -77,6 +77,19 @@ const run = async () => {
       encryption_applied: 0,
     },
   ]);
+  const parsedFromTodoFlag = normalizeJoplinTodos([
+    {
+      id: 'todo-flagged',
+      title: 'Legacy todo flag item',
+      type_: 1,
+      is_todo: 1,
+      todo_due: 0,
+      todo_completed: 0,
+      updated_time: Date.now(),
+      encryption_applied: 0,
+    },
+  ]);
+  assert.equal(parsedFromTodoFlag.length, 1, 'is_todo 플래그가 있으면 todo로 처리해야 합니다.');
   assert.equal(parsed[0]?.title, '(제목 없음)', '빈 제목은 기본 텍스트를 사용해야 합니다.');
   assert.equal(parsed[0]?.due, null, '비정상 due 값은 null 처리해야 합니다.');
 
@@ -94,6 +107,18 @@ Body`);
   assert.ok(parsedFromMetadata, '메타데이터 파싱 결과가 있어야 합니다.');
   assert.equal(parsedFromMetadata?.id, 'meta-1');
   assert.equal(parsedFromMetadata?.todo_due, 0, '잘못된 숫자 필드는 0으로 보정해야 합니다.');
+
+  const parsedTodoFlagMetadata = __private__.parseJoplinMetadata(`id: meta-flag-1
+title: Metadata todo via flag
+type_: 1
+is_todo: 1
+todo_due: 0
+todo_completed: 0
+updated_time: 1700000000000
+encryption_applied: 0
+
+Body`);
+  assert.equal(parsedTodoFlagMetadata?.is_todo, 1, 'is_todo 필드를 파싱해야 합니다.');
 
   const missingId = __private__.parseJoplinMetadata('title: no-id\ntype_: 13\n\nBody');
   assert.equal(missingId, null, 'id가 없는 메타데이터는 무시해야 합니다.');

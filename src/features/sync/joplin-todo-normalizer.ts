@@ -29,7 +29,7 @@ export const normalizeJoplinTodos = (rawItems: JoplinRawTodo[]): TodoItem[] => {
   }
 
   return rawItems
-    .filter((item) => item.type_ === JOPLIN_TODO_TYPE)
+    .filter((item) => item.type_ === JOPLIN_TODO_TYPE || Number(item.is_todo) === 1)
     .map((item) => ({
       id: item.id,
       title: item.title?.trim() || '(제목 없음)',

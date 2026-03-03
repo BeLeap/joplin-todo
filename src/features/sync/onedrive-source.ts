@@ -65,6 +65,7 @@ const parseJoplinMetadata = (content: string): JoplinRawTodo | null => {
     id,
     title: map.get('title') ?? '',
     type_: parseIntegerField(map.get('type_')),
+    is_todo: parseIntegerField(map.get('is_todo')),
     todo_due: parseIntegerField(map.get('todo_due')),
     todo_completed: parseIntegerField(map.get('todo_completed')),
     updated_time: parseIntegerField(map.get('updated_time')),
