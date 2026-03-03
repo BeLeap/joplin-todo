@@ -11,8 +11,8 @@ import {
   OneDriveNetworkError,
   OneDrivePermissionError,
 } from '@/features/sync/errors';
-import { MockOneDriveJoplinSource } from '@/features/sync/mock-onedrive-source';
 import { GraphOneDriveJoplinSource, type OneDriveJoplinSource } from '@/features/sync/onedrive-source';
+import { useOneDriveAuth } from '@/features/sync/use-onedrive-auth';
 import { syncTodosFromOneDriveWithCacheFallback } from '@/features/sync/sync-todos';
 import { publishTodosToWidget } from '@/features/widget/widget-bridge';
 import { createWidgetBridge } from '@/features/widget/widget-bridge-factory';
@@ -20,16 +20,7 @@ import { getWidgetSnapshotState } from '@/features/widget/widget-state';
 import type { TodoItem } from '@/features/todo/types';
 import { AsyncStorageTodoCache } from '@/storage/todo-cache';
 
-const createSyncSource = (): OneDriveJoplinSource => {
-  const token = process.env.EXPO_PUBLIC_ONEDRIVE_ACCESS_TOKEN;
-  if (token?.trim()) {
-    return new GraphOneDriveJoplinSource(token);
-  }
-
-  return new MockOneDriveJoplinSource();
-};
-
-const source = createSyncSource();
+const createSyncSource = (token: string): OneDriveJoplinSource => new GraphOneDriveJoplinSource(token);
 const cache = new AsyncStorageTodoCache();
 const widgetBridge = createWidgetBridge();
 
@@ -77,6 +68,8 @@ const toUserFriendlyError = (error: unknown) => {
 };
 
 export default function HomeScreen() {
+  const { hasClientId, hasSession, isLoading: isAuthLoading, signIn, signOut, getValidAccessToken } =
+    useOneDriveAuth();
   const [todos, setTodos] = useState<TodoItem[]>([]);
   const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null);
   const [status, setStatus] = useState<SyncStatus>('idle');
@@ -92,6 +85,16 @@ export default function HomeScreen() {
   }, []);
 
   const refreshTodos = useCallback(async () => {
+    const envToken = process.env.EXPO_PUBLIC_ONEDRIVE_ACCESS_TOKEN?.trim() || null;
+    const sessionToken = await getValidAccessToken();
+    const token = sessionToken ?? envToken;
+
+    if (!token) {
+      setStatus('error');
+      setErrorMessage('OneDrive 로그인이 필요합니다.');
+      return;
+    }
+
     setStatus('syncing');
     setErrorMessage(null);
 
@@ -100,6 +103,7 @@ export default function HomeScreen() {
     });
 
     try {
+      const source = createSyncSource(token);
       const result = await syncTodosFromOneDriveWithCacheFallback(source, cache, {
         maxRetries: 2,
         retryDelayMs: 500,
@@ -126,16 +130,36 @@ export default function HomeScreen() {
       setStatus('error');
       setErrorMessage(friendlyError);
     }
-  }, [lastSyncedAt, loadCachedTodos, todos]);
+  }, [getValidAccessToken, lastSyncedAt, loadCachedTodos, todos]);
 
   useEffect(() => {
     const initialize = async () => {
       await loadCachedTodos();
-      await refreshTodos();
+      if (process.env.EXPO_PUBLIC_ONEDRIVE_ACCESS_TOKEN?.trim() || hasSession) {
+        await refreshTodos();
+      }
     };
 
     void initialize();
-  }, [loadCachedTodos, refreshTodos]);
+  }, [hasSession, loadCachedTodos, refreshTodos]);
+
+
+  const handleSignIn = useCallback(async () => {
+    try {
+      setErrorMessage(null);
+      await signIn();
+      await refreshTodos();
+    } catch (error) {
+      setStatus('error');
+      setErrorMessage(toUserFriendlyError(error));
+    }
+  }, [refreshTodos, signIn]);
+
+  const handleSignOut = useCallback(async () => {
+    await signOut();
+    setStatus('idle');
+    setErrorMessage(null);
+  }, [signOut]);
 
   const statusMessage = useMemo(() => {
     switch (status) {
@@ -161,9 +185,26 @@ export default function HomeScreen() {
             <ThemedText>{statusMessage}</ThemedText>
             <ThemedText type="small">마지막 동기화: {formatSyncedAtLabel(lastSyncedAt)}</ThemedText>
 
-            <Pressable style={styles.refreshButton} onPress={() => void refreshTodos()}>
-              <ThemedText type="link">수동 새로고침</ThemedText>
-            </Pressable>
+            {hasSession || process.env.EXPO_PUBLIC_ONEDRIVE_ACCESS_TOKEN?.trim() ? (
+              <>
+                <Pressable style={styles.refreshButton} onPress={() => void refreshTodos()}>
+                  <ThemedText type="link">수동 새로고침</ThemedText>
+                </Pressable>
+                {hasSession ? (
+                  <Pressable style={styles.refreshButton} onPress={() => void handleSignOut()}>
+                    <ThemedText type="link">로그아웃</ThemedText>
+                  </Pressable>
+                ) : null}
+              </>
+            ) : (
+              <Pressable
+                style={styles.refreshButton}
+                onPress={() => void handleSignIn()}
+                disabled={!hasClientId || isAuthLoading}
+              >
+                <ThemedText type="link">{hasClientId ? 'OneDrive 로그인' : 'Client ID 설정 필요'}</ThemedText>
+              </Pressable>
+            )}
 
             {errorMessage ? (
               <ThemedText type="small" themeColor="textSecondary">
