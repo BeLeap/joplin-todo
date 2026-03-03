@@ -11,6 +11,7 @@ in
       jdk17
       git
       android-tools
+      eas-cli
     ];
 
     shellHook = ''
