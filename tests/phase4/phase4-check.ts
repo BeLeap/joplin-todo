@@ -199,7 +199,8 @@ const run = async () => {
           {
             id: 'todo-3',
             title: 'Run refresh',
-            type_: 13,
+            type_: 1,
+            is_todo: 1,
             todo_due: Date.parse('2026-03-03T09:00:00.000Z'),
             todo_completed: 0,
             updated_time: Date.parse('2026-03-02T09:00:00.000Z'),
