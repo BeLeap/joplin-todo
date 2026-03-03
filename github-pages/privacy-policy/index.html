@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>개인정보처리방침 | Joplin Todo</title>
+    <style>
+      :root {
+        --bg: #f7f8fa;
+        --surface: #ffffff;
+        --text: #1f2937;
+        --muted: #6b7280;
+        --primary: #0f766e;
+        --border: #e5e7eb;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans KR", sans-serif;
+        line-height: 1.7;
+        color: var(--text);
+        background: linear-gradient(180deg, #f2f4f7 0%, #f7f8fa 100%);
+      }
+
+      .wrap {
+        max-width: 860px;
+        margin: 0 auto;
+        padding: 32px 20px 64px;
+      }
+
+      .card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        padding: 28px 24px;
+      }
+
+      h1 {
+        margin: 0 0 8px;
+        font-size: 1.9rem;
+      }
+
+      .meta {
+        margin: 0;
+        color: var(--muted);
+        font-size: 0.95rem;
+      }
+
+      h2 {
+        margin: 28px 0 10px;
+        color: var(--primary);
+        font-size: 1.15rem;
+      }
+
+      ul {
+        margin: 8px 0 0 20px;
+        padding: 0;
+      }
+
+      li + li {
+        margin-top: 6px;
+      }
+
+      .notice {
+        border-left: 4px solid var(--primary);
+        background: #f0fdfa;
+        padding: 10px 12px;
+        margin-top: 18px;
+      }
+
+      code {
+        background: #f3f4f6;
+        border-radius: 6px;
+        padding: 1px 6px;
+      }
+    </style>
+  </head>
+  <body>
+    <main class="wrap">
+      <article class="card">
+        <h1>개인정보처리방침</h1>
+        <p class="meta">서비스명: Joplin Todo</p>
+        <p class="meta">시행일: 2026-03-03</p>
+        <p class="meta">최종 업데이트: 2026-03-03</p>
+
+        <h2>1. 총칙</h2>
+        <p>
+          Joplin Todo(이하 "앱")는 사용자의 OneDrive에 저장된 Joplin TODO를 불러와 앱 및 위젯에 표시합니다.
+          본 방침은 현재 코드 기준으로 어떤 정보가 처리되는지, 어디로 전송되는지, 기기 내 저장 방식이 무엇인지 설명합니다.
+        </p>
+
+        <h2>2. 처리하는 정보 항목</h2>
+        <ul>
+          <li>OneDrive OAuth 인증 정보: Access Token, Refresh Token, 만료시각</li>
+          <li>OAuth 범위(scope): <code>openid</code>, <code>profile</code>, <code>offline_access</code>, <code>Files.Read</code></li>
+          <li>OneDrive에서 읽은 Joplin TODO 데이터: 할 일 제목, 마감일, 완료여부, 수정시각, 항목 ID</li>
+          <li>동기화 메타데이터: 마지막 동기화 시각, 위젯 상태/오류 메시지</li>
+        </ul>
+
+        <h2>3. 처리 목적</h2>
+        <ul>
+          <li>Microsoft 계정 로그인 및 인증 상태 유지</li>
+          <li>OneDrive의 Joplin 동기화 폴더에서 TODO를 읽어 화면/위젯에 표시</li>
+          <li>오프라인 또는 네트워크 오류 시 마지막 캐시 표시</li>
+          <li>위젯 새로고침 스케줄 관리</li>
+        </ul>
+
+        <h2>4. 제3자 제공 및 국외 이전</h2>
+        <p>
+          앱은 자체 서버로 개인정보를 전송하지 않습니다. 다만 기능 수행을 위해 Microsoft 서비스와 통신합니다.
+        </p>
+        <ul>
+          <li>인증: <code>login.microsoftonline.com</code></li>
+          <li>데이터 조회: <code>graph.microsoft.com</code> (Microsoft Graph API)</li>
+        </ul>
+        <p>위 통신은 사용자가 로그인/동기화를 실행할 때 발생합니다.</p>
+
+        <h2>5. 기기 내 저장(로컬 저장소)</h2>
+        <p>앱은 아래 정보를 사용자 기기의 AsyncStorage에 저장합니다.</p>
+        <ul>
+          <li><code>@joplinTodo/onedriveAuth</code>: OneDrive 인증 토큰 정보</li>
+          <li><code>joplin-todo/cache/v1</code>: TODO 캐시 및 마지막 동기화 시각</li>
+          <li><code>widget:snapshot</code>, <code>widget:refresh-at</code>: 위젯 표시 데이터/갱신시각</li>
+        </ul>
+
+        <h2>6. 보관 및 삭제</h2>
+        <p>
+          OneDrive 인증 토큰, TODO 캐시, 위젯 데이터는 앱 사용 중 기기 로컬 저장소에 유지됩니다.
+          현재 사용 중인 버전에 로그아웃/초기화 기능이 없다면, 앱 삭제 또는 기기 앱 데이터 삭제로 제거할 수 있습니다.
+        </p>
+
+        <h2>7. 자동 수집, 광고/분석 도구</h2>
+        <p>
+          현재 코드(2026-03-03 기준)에는 별도의 광고 SDK, 사용자 행동분석 SDK, 크래시 리포팅 SDK가 포함되어 있지 않습니다.
+          향후 도입 시 본 방침을 개정해 고지합니다.
+        </p>
+
+        <h2>8. 이용자 권리 및 선택권</h2>
+        <ul>
+          <li>OneDrive 로그인을 하지 않으면 OneDrive 데이터 조회가 이루어지지 않습니다.</li>
+          <li>앱 삭제 또는 앱 데이터 삭제로 로컬 저장 정보를 제거할 수 있습니다.</li>
+        </ul>
+
+        <h2>9. 안전성 확보 조치</h2>
+        <ul>
+          <li>OAuth 2.0 + PKCE 기반 인증 절차 사용</li>
+          <li>HTTPS를 통한 Microsoft API 통신</li>
+          <li>필요 최소 범위(<code>Files.Read</code> 등) 권한 요청</li>
+        </ul>
+
+        <h2>10. 문의처</h2>
+        <p>
+          개인정보 관련 문의는 아래 이메일로 연락해 주세요.<br />
+          이메일: <code>beleap@beleap.dev</code>
+        </p>
+
+        <h2>11. 방침 변경</h2>
+        <p>
+          본 방침은 법령 및 서비스 변경에 따라 수정될 수 있습니다. 중요한 변경 사항은 시행 전에 본 페이지를 통해 안내합니다.
+        </p>
+      </article>
+    </main>
+  </body>
+</html>
