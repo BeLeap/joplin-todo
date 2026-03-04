@@ -115,7 +115,13 @@ export default function HomeScreen() {
       const result = await syncTodosFromOneDriveWithCacheFallback(source, cache, {
         maxRetries: 2,
         retryDelayMs: 500,
-        onProgress: (progress) => setSyncProgress(progress),
+        onProgress: (progress) =>
+          setSyncProgress((previousProgress) => ({
+            ...progress,
+            currentFileName:
+              progress.currentFileName ??
+              (progress.phase === 'downloading' ? previousProgress?.currentFileName ?? null : null),
+          })),
         onTodoParsed: (todo) => {
           setTodos((previousTodos) =>
             sortTodosByDueDate([
@@ -187,7 +193,12 @@ export default function HomeScreen() {
           return '동기화 중...';
         }
 
-        const { completed, total, currentFileName } = syncProgress;
+        const { phase, completed, total, currentFileName } = syncProgress;
+
+        if (phase === 'listing') {
+          return '동기화 중... 파일 목록을 확인하는 중';
+        }
+
         const progressLabel = `(${Math.min(completed, total)}/${total})`;
         const fileLabel = currentFileName ? ` ${currentFileName}` : '';
         return `동기화 중... ${progressLabel}${fileLabel}`;
