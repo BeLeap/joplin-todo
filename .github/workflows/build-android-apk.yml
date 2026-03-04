@@ -5,6 +5,10 @@ on:
     branches:
       - develop
 
+concurrency:
+  group: build-android-apk-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build-apk:
     runs-on: ubuntu-latest
@@ -23,6 +27,16 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Cache Expo/EAS local build data
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.eas
+            ~/.expo
+          key: ${{ runner.os }}-expo-eas-${{ hashFiles('package-lock.json', 'eas.json', 'app.json', 'app.config.*') }}
+          restore-keys: |
+            ${{ runner.os }}-expo-eas-
+
       - name: Generate Android project (Expo prebuild)
         run: npx expo prebuild --platform android --non-interactive --no-install
 
@@ -37,7 +51,8 @@ jobs:
       - name: Build release APK via EAS CLI
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
-        run: npx eas-cli@latest build --platform android --profile preview --local --output app-release.apk
+          EAS_LOCAL_BUILD_SKIP_CLEANUP: 1
+        run: npx eas-cli@16.20.0 build --platform android --profile preview --local --output app-release.apk
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
