@@ -12,4 +12,5 @@ remote-submit:
     npx eas-cli@latest submit --platform android --latest
 
 check:
+    npx expo-doctor
     npx tsc --noEmit
