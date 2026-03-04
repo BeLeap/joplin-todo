@@ -37,6 +37,14 @@ const parseIntegerField = (value: string | undefined, fallback = 0) => {
   return parsed;
 };
 
+const isAbortError = (error: unknown) => {
+  if (!error || typeof error !== 'object') {
+    return false;
+  }
+
+  return 'name' in error && error.name === 'AbortError';
+};
+
 const parseJoplinMetadata = (content: string): JoplinRawTodo | null => {
   const normalizedContent = content.charCodeAt(0) === 0xfeff ? content.slice(1) : content;
   const lines = normalizedContent.replace(/\r/g, '').split('\n');
@@ -240,7 +248,7 @@ export class GraphOneDriveJoplinSource implements OneDriveJoplinSource {
       } catch (error) {
         if (attempt >= maxRetries) {
           const message =
-            error instanceof DOMException && error.name === 'AbortError'
+            isAbortError(error)
               ? `request-timeout(${requestTimeoutMs}ms)`
               : error instanceof Error
                 ? error.message
