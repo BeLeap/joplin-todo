@@ -1,4 +1,5 @@
 import { sortTodosByDueDate } from '@/features/todo/sort';
+import type { TodoItem } from '@/features/todo/types';
 import type { TodoCache } from '@/storage/todo-cache';
 
 import { OneDriveNetworkError } from './errors';
@@ -10,7 +11,7 @@ type SyncOptions = {
   maxRetries?: number;
   retryDelayMs?: number;
   onProgress?: (progress: OneDriveSyncProgress) => void;
-  onTodoParsed?: (todo: ReturnType<typeof toTodoItem>) => void;
+  onTodoParsed?: (todo: TodoItem) => void;
 };
 
 const sleep = async (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
