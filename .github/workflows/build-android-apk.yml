@@ -32,6 +32,8 @@ jobs:
         run: npm ci
 
       - name: Build release APK via just
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
         run: just local-apk-build
 
       - name: Upload APK artifact
