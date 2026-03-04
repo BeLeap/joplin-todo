@@ -18,12 +18,14 @@ jobs:
         with:
           node-version: 22
           cache: npm
+          cache-dependency-path: package-lock.json
 
       - name: Setup Java
         uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: 17
+          cache: gradle
 
       - name: Install just
         uses: taiki-e/install-action@just
