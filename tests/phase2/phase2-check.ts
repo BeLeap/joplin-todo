@@ -157,6 +157,11 @@ Body`);
   assert.equal(parsedFromMetadata?.id, 'meta-1');
   assert.equal(parsedFromMetadata?.title, 'Hello, World!', '첫 줄을 제목으로 파싱해야 합니다.');
   assert.equal(parsedFromMetadata?.todo_due, 0, '잘못된 숫자 필드는 0으로 보정해야 합니다.');
+  assert.equal(
+    parsedFromMetadata?.updated_time,
+    1700000000000,
+    'updated_time 숫자 필드를 파싱해야 합니다.',
+  );
 
   const parsedTodoFlagMetadata = __private__.parseJoplinMetadata(`id: meta-flag-1
 title: Metadata todo via flag
@@ -169,6 +174,30 @@ encryption_applied: 0
 
 Body`);
   assert.equal(parsedTodoFlagMetadata?.is_todo, 1, 'is_todo 필드를 파싱해야 합니다.');
+  assert.equal(
+    parsedTodoFlagMetadata?.title,
+    'Metadata todo via flag',
+    '메타데이터가 먼저 시작되는 파일은 title 필드를 제목으로 사용해야 합니다.',
+  );
+
+  const parsedFromBodyThenMetadata = __private__.parseJoplinMetadata(`Body line 1
+Body line 2
+
+id: body-meta-1
+type_: 1
+is_todo: 1
+todo_due: 0
+todo_completed: 0
+updated_time: 2026-03-04T05:18:43.454Z
+encryption_applied: 0`);
+  assert.ok(parsedFromBodyThenMetadata, '본문 뒤 메타데이터 형식도 파싱해야 합니다.');
+  assert.equal(parsedFromBodyThenMetadata?.id, 'body-meta-1');
+  assert.equal(parsedFromBodyThenMetadata?.is_todo, 1);
+  assert.equal(
+    parsedFromBodyThenMetadata?.updated_time,
+    Date.parse('2026-03-04T05:18:43.454Z'),
+    'ISO 시간 형식의 updated_time도 파싱해야 합니다.',
+  );
 
   const missingId = __private__.parseJoplinMetadata('title: no-id\ntype_: 13\n\nBody');
   assert.equal(missingId, null, 'id가 없는 메타데이터는 무시해야 합니다.');
