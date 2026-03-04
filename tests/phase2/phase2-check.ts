@@ -6,8 +6,8 @@ import { MockOneDriveJoplinSource } from '@/features/sync/mock-onedrive-source';
 import {
   GraphOneDriveJoplinSource,
   __private__,
+  type OneDriveListOptions,
   type OneDriveJoplinSource,
-  type OneDriveSyncProgress,
 } from '@/features/sync/onedrive-source';
 import { syncTodosFromOneDrive, syncTodosFromOneDriveWithCacheFallback } from '@/features/sync/sync-todos';
 import type { JoplinRawTodo } from '@/features/sync/types';
@@ -15,9 +15,11 @@ import { InMemoryTodoCache } from '@/storage/todo-cache';
 
 class FlakySource implements OneDriveJoplinSource {
   private attempt = 0;
+  public receivedModifiedSince: string | null | undefined;
 
-  async listJoplinItems() {
+  async listJoplinItems(options: OneDriveListOptions = {}) {
     this.attempt += 1;
+    this.receivedModifiedSince = options.modifiedSince;
 
     if (this.attempt === 1) {
       throw new OneDriveNetworkError('temporary');
@@ -39,9 +41,7 @@ class FlakySource implements OneDriveJoplinSource {
 }
 
 class AlwaysFailNetworkSource implements OneDriveJoplinSource {
-  async listJoplinItems(
-    _onProgress?: (progress: OneDriveSyncProgress) => void,
-  ): Promise<JoplinRawTodo[]> {
+  async listJoplinItems(_options?: OneDriveListOptions): Promise<JoplinRawTodo[]> {
     throw new OneDriveNetworkError('offline');
   }
 }
@@ -136,11 +136,13 @@ Body`);
   assert.equal(missingId, null, 'id가 없는 메타데이터는 무시해야 합니다.');
 
   const flakyCache = new InMemoryTodoCache();
-  const flakyResult = await syncTodosFromOneDrive(new FlakySource(), flakyCache, {
+  const flakySource = new FlakySource();
+  const flakyResult = await syncTodosFromOneDrive(flakySource, flakyCache, {
     maxRetries: 1,
     retryDelayMs: 1,
   });
   assert.equal(flakyResult.todos[0]?.id, 'todo-retry', '네트워크 오류는 재시도 후 성공해야 합니다.');
+  assert.equal(flakySource.receivedModifiedSince, null, '최초 동기화는 modifiedSince 없이 요청해야 합니다.');
 
   await flakyCache.saveTodos(flakyResult.todos, flakyResult.syncedAt);
   const fallbackResult = await syncTodosFromOneDriveWithCacheFallback(
@@ -202,6 +204,13 @@ Body`,
             id: 'item-1',
             name: 'todo.md',
             file: {},
+            lastModifiedDateTime: '2026-03-02T09:00:00.000Z',
+          },
+          {
+            id: 'item-2',
+            name: 'older.md',
+            file: {},
+            lastModifiedDateTime: '2026-03-01T09:00:00.000Z',
           },
         ],
       }),
@@ -216,7 +225,9 @@ Body`,
     maxRetries: 1,
     baseDelayMs: 1,
   });
-  const graphItems = await graphSource.listJoplinItems();
+  const graphItems = await graphSource.listJoplinItems({
+    modifiedSince: '2026-03-02T00:00:00.000Z',
+  });
   assert.equal(graphAttempt, 3, '429 응답은 지수 백오프로 재시도 후 성공해야 합니다.');
   assert.equal(graphItems.length, 1);
 

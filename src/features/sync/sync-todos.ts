@@ -14,6 +14,12 @@ type SyncOptions = {
 
 const sleep = async (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
+const mergeTodosById = (previousTodos: TodoSyncResult['todos'], incomingTodos: TodoSyncResult['todos']) => {
+  const byId = new Map(previousTodos.map((todo) => [todo.id, todo]));
+  incomingTodos.forEach((todo) => byId.set(todo.id, todo));
+  return sortTodosByDueDate([...byId.values()]);
+};
+
 export const syncTodosFromOneDrive = async (
   source: OneDriveJoplinSource,
   cache: TodoCache,
@@ -25,15 +31,23 @@ export const syncTodosFromOneDrive = async (
   let lastError: unknown;
   for (let attempt = 0; attempt <= maxRetries; attempt += 1) {
     try {
-      const rawItems = await source.listJoplinItems(options.onProgress);
+      const previousSnapshot = await cache.loadTodos();
+      const rawItems = await source.listJoplinItems({
+        modifiedSince: previousSnapshot.lastSyncedAt,
+        onProgress: options.onProgress,
+      });
       const normalizedTodos = normalizeJoplinTodos(rawItems);
       const sortedTodos = sortTodosByDueDate(normalizedTodos);
+      const todosToPersist =
+        previousSnapshot.lastSyncedAt === null
+          ? sortedTodos
+          : mergeTodosById(previousSnapshot.todos, sortedTodos);
       const syncedAt = new Date().toISOString();
 
-      await cache.saveTodos(sortedTodos, syncedAt);
+      await cache.saveTodos(todosToPersist, syncedAt);
 
       return {
-        todos: sortedTodos,
+        todos: todosToPersist,
         syncedAt,
         source: 'onedrive',
       };

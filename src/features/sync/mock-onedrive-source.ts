@@ -1,8 +1,8 @@
-import type { OneDriveJoplinSource, OneDriveSyncProgress } from './onedrive-source';
+import type { OneDriveJoplinSource, OneDriveListOptions } from './onedrive-source';
 import type { JoplinRawTodo } from './types';
 
 export class MockOneDriveJoplinSource implements OneDriveJoplinSource {
-  async listJoplinItems(onProgress?: (progress: OneDriveSyncProgress) => void): Promise<JoplinRawTodo[]> {
+  async listJoplinItems(options: OneDriveListOptions = {}): Promise<JoplinRawTodo[]> {
     const items = [
       {
         id: 'todo-1',
@@ -36,7 +36,7 @@ export class MockOneDriveJoplinSource implements OneDriveJoplinSource {
     ];
 
     items.forEach((item, index) => {
-      onProgress?.({
+      options.onProgress?.({
         phase: 'downloading',
         currentFileName: `${item.id}.md`,
         completed: index + 1,
