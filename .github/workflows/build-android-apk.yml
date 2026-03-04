@@ -20,23 +20,24 @@ jobs:
           cache: npm
           cache-dependency-path: package-lock.json
 
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Android project (Expo prebuild)
+        run: npx expo prebuild --platform android --non-interactive --no-install
+
       - name: Setup Java
         uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: 17
+          # Safe now because prebuild creates android/gradle files before setup-java cache scan.
           cache: gradle
 
-      - name: Install just
-        uses: taiki-e/install-action@just
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Build release APK via just
+      - name: Build release APK via EAS CLI
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
-        run: just local-apk-build
+        run: npx eas-cli@latest build --platform android --profile preview --local --output app-release.apk
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
