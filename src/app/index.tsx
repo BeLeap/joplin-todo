@@ -113,8 +113,9 @@ export default function HomeScreen() {
     setSyncProgress(null);
     setTodos([]);
 
-    await publishTodosToWidget(widgetBridge, todos, lastSyncedAt, {
-      state: getWidgetSnapshotState(todos.length, 'syncing'),
+    const cachedSnapshot = await cache.loadTodos();
+    await publishTodosToWidget(widgetBridge, cachedSnapshot.todos, cachedSnapshot.lastSyncedAt, {
+      state: getWidgetSnapshotState(cachedSnapshot.todos.length, 'syncing'),
     });
 
     try {
@@ -171,7 +172,7 @@ export default function HomeScreen() {
       setSyncProgress(null);
       setSyncStatusDetail('오류로 인해 서버 동기화를 중단하고 캐시 데이터를 복원함');
     }
-  }, [getValidAccessToken, lastSyncedAt, loadCachedTodos, todos]);
+  }, [getValidAccessToken, loadCachedTodos]);
 
   useEffect(() => {
     const initialize = async () => {
