@@ -27,14 +27,27 @@ export const syncTodosFromOneDrive = async (
   let lastError: unknown;
   for (let attempt = 0; attempt <= maxRetries; attempt += 1) {
     try {
+      const snapshot = await cache.loadTodos();
       const rawItems = await source.listJoplinItems(options.onProgress, (item) => {
         const todoItem = toTodoItem(item);
         if (todoItem) {
           options.onTodoParsed?.(todoItem);
         }
+      }, {
+        modifiedSince: snapshot.lastSyncedAt,
       });
       const normalizedTodos = normalizeJoplinTodos(rawItems);
-      const sortedTodos = sortTodosByDueDate(normalizedTodos);
+      const mergedTodos =
+        source.incrementalMode === 'modifiedSince' && snapshot.lastSyncedAt
+          ? (() => {
+              const byId = new Map(snapshot.todos.map((todo) => [todo.id, todo]));
+              normalizedTodos.forEach((todo) => {
+                byId.set(todo.id, todo);
+              });
+              return Array.from(byId.values());
+            })()
+          : normalizedTodos;
+      const sortedTodos = sortTodosByDueDate(mergedTodos);
       const syncedAt = new Date().toISOString();
 
       await cache.saveTodos(sortedTodos, syncedAt);

@@ -46,6 +46,44 @@ class AlwaysFailNetworkSource implements OneDriveJoplinSource {
   }
 }
 
+class IncrementalSource implements OneDriveJoplinSource {
+  readonly incrementalMode = 'modifiedSince' as const;
+
+  async listJoplinItems(
+    _onProgress?: (progress: OneDriveSyncProgress) => void,
+    _onItem?: (item: JoplinRawTodo) => void,
+    options?: { modifiedSince?: string | null },
+  ) {
+    if (!options?.modifiedSince) {
+      return [
+        {
+          id: 'todo-existing',
+          title: 'Existing todo',
+          type_: 1,
+          is_todo: 1,
+          todo_due: 0,
+          todo_completed: 0,
+          updated_time: Date.now(),
+          encryption_applied: 0,
+        },
+      ];
+    }
+
+    return [
+      {
+        id: 'todo-new',
+        title: 'New todo',
+        type_: 1,
+        is_todo: 1,
+        todo_due: 0,
+        todo_completed: 0,
+        updated_time: Date.now(),
+        encryption_applied: 0,
+      },
+    ];
+  }
+}
+
 const run = async () => {
   const cache = new InMemoryTodoCache();
   const source = new MockOneDriveJoplinSource();
@@ -158,6 +196,16 @@ Body`);
     '캐시 fallback 시 마지막 성공 동기화 시각을 유지해야 합니다.',
   );
 
+  const incrementalCache = new InMemoryTodoCache();
+  const incrementalSource = new IncrementalSource();
+  await syncTodosFromOneDrive(incrementalSource, incrementalCache);
+  const incrementalSynced = await syncTodosFromOneDrive(incrementalSource, incrementalCache);
+  assert.equal(
+    incrementalSynced.todos.length,
+    2,
+    '증분 동기화에서는 기존 캐시 todo와 변경 todo를 병합해야 합니다.',
+  );
+
   const originalFetch = globalThis.fetch;
   let graphAttempt = 0;
   globalThis.fetch = (async (input) => {
@@ -201,6 +249,7 @@ Body`,
           {
             id: 'item-1',
             name: 'todo.md',
+            lastModifiedDateTime: '2026-03-02T10:00:00.000Z',
             file: {},
           },
         ],
@@ -219,6 +268,66 @@ Body`,
   const graphItems = await graphSource.listJoplinItems();
   assert.equal(graphAttempt, 3, '429 응답은 지수 백오프로 재시도 후 성공해야 합니다.');
   assert.equal(graphItems.length, 1);
+
+  let incrementalDownloadCount = 0;
+  globalThis.fetch = (async (input) => {
+    const requestUrl =
+      typeof input === 'string'
+        ? input
+        : input instanceof URL
+          ? input.toString()
+          : input.url;
+
+    if (requestUrl.endsWith('/content')) {
+      incrementalDownloadCount += 1;
+      return new Response(
+        `changed item
+id: todo-incremental
+type_: 1
+is_todo: 1
+todo_due: 0
+todo_completed: 0
+updated_time: 1700000000000
+encryption_applied: 0
+
+Body`,
+        {
+          status: 200,
+          headers: { 'content-type': 'text/plain' },
+        },
+      );
+    }
+
+    return new Response(
+      JSON.stringify({
+        value: [
+          {
+            id: 'item-unchanged',
+            name: 'todo-unchanged.md',
+            lastModifiedDateTime: '2026-03-02T09:59:59.000Z',
+            file: {},
+          },
+          {
+            id: 'item-changed',
+            name: 'todo-changed.md',
+            lastModifiedDateTime: '2026-03-02T10:00:01.000Z',
+            file: {},
+          },
+        ],
+      }),
+      {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      },
+    );
+  }) as typeof fetch;
+
+  const incrementalItems = await graphSource.listJoplinItems(undefined, undefined, {
+    modifiedSince: '2026-03-02T10:00:00.000Z',
+  });
+  assert.equal(incrementalDownloadCount, 1, '마지막 동기화 이후 수정된 파일만 다운로드해야 합니다.');
+  assert.equal(incrementalItems.length, 1);
+  assert.equal(incrementalItems[0]?.id, 'todo-incremental');
 
   globalThis.fetch = originalFetch;
 
