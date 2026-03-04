@@ -12,6 +12,7 @@ const DEFAULT_GRAPH_RETRY_BASE_DELAY_MS = 300;
 type GraphDriveItem = {
   id: string;
   name: string;
+  lastModifiedDateTime?: string;
   file?: Record<string, unknown>;
 };
 
@@ -174,9 +175,13 @@ const toGraphError = async (response: Response, context: GraphRequestContext) =>
 };
 
 export interface OneDriveJoplinSource {
+  readonly incrementalMode?: 'modifiedSince';
   listJoplinItems(
     onProgress?: (progress: OneDriveSyncProgress) => void,
     onItem?: (item: JoplinRawTodo) => void,
+    options?: {
+      modifiedSince?: string | null;
+    },
   ): Promise<JoplinRawTodo[]>;
 }
 
@@ -188,6 +193,8 @@ export type OneDriveSyncProgress = {
 };
 
 export class GraphOneDriveJoplinSource implements OneDriveJoplinSource {
+  readonly incrementalMode = 'modifiedSince' as const;
+
   constructor(
     private readonly accessToken: string,
     private readonly retryOptions: {
@@ -252,9 +259,11 @@ export class GraphOneDriveJoplinSource implements OneDriveJoplinSource {
     );
   }
 
-  private async listJoplinFiles() {
+  private async listJoplinFiles(modifiedSince?: string | null) {
     const files: GraphDriveItem[] = [];
     let nextLink = `${GRAPH_BASE_URL}${JOPLIN_FOLDER_PATH}:/children?$top=${JOPLIN_SYNC_PAGE_SIZE}`;
+    const modifiedSinceMs = modifiedSince ? Date.parse(modifiedSince) : Number.NaN;
+    const shouldFilterByModifiedSince = Number.isFinite(modifiedSinceMs);
 
     while (nextLink) {
       const response = await this.graphFetch(nextLink, {
@@ -263,7 +272,20 @@ export class GraphOneDriveJoplinSource implements OneDriveJoplinSource {
       });
       const body = (await response.json()) as GraphListResponse;
       const page = body.value?.filter((item) => item.file && isJoplinItemFile(item.name)) ?? [];
-      files.push(...page);
+      const filtered = shouldFilterByModifiedSince
+        ? page.filter((item) => {
+            const lastModifiedMs = item.lastModifiedDateTime
+              ? Date.parse(item.lastModifiedDateTime)
+              : Number.NaN;
+
+            if (!Number.isFinite(lastModifiedMs)) {
+              return true;
+            }
+
+            return lastModifiedMs > modifiedSinceMs;
+          })
+        : page;
+      files.push(...filtered);
       nextLink = body['@odata.nextLink'] ?? '';
     }
 
@@ -273,8 +295,9 @@ export class GraphOneDriveJoplinSource implements OneDriveJoplinSource {
   async listJoplinItems(
     onProgress?: (progress: OneDriveSyncProgress) => void,
     onItem?: (item: JoplinRawTodo) => void,
+    options: { modifiedSince?: string | null } = {},
   ): Promise<JoplinRawTodo[]> {
-    const files = await this.listJoplinFiles();
+    const files = await this.listJoplinFiles(options.modifiedSince);
     onProgress?.({
       phase: 'downloading',
       currentFileName: null,
