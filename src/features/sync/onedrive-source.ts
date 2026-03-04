@@ -174,7 +174,10 @@ const toGraphError = async (response: Response, context: GraphRequestContext) =>
 };
 
 export interface OneDriveJoplinSource {
-  listJoplinItems(onProgress?: (progress: OneDriveSyncProgress) => void): Promise<JoplinRawTodo[]>;
+  listJoplinItems(
+    onProgress?: (progress: OneDriveSyncProgress) => void,
+    onItem?: (item: JoplinRawTodo) => void,
+  ): Promise<JoplinRawTodo[]>;
 }
 
 export type OneDriveSyncProgress = {
@@ -267,7 +270,10 @@ export class GraphOneDriveJoplinSource implements OneDriveJoplinSource {
     return files;
   }
 
-  async listJoplinItems(onProgress?: (progress: OneDriveSyncProgress) => void): Promise<JoplinRawTodo[]> {
+  async listJoplinItems(
+    onProgress?: (progress: OneDriveSyncProgress) => void,
+    onItem?: (item: JoplinRawTodo) => void,
+  ): Promise<JoplinRawTodo[]> {
     const files = await this.listJoplinFiles();
     onProgress?.({
       phase: 'downloading',
@@ -291,7 +297,11 @@ export class GraphOneDriveJoplinSource implements OneDriveJoplinSource {
         logicalPath: `${JOPLIN_FOLDER_PATH}/${file.name}`,
       });
       const content = await response.text();
-      rawItems.push(parseJoplinMetadata(content));
+      const parsedItem = parseJoplinMetadata(content);
+      rawItems.push(parsedItem);
+      if (parsedItem) {
+        onItem?.(parsedItem);
+      }
 
       onProgress?.({
         phase: 'downloading',

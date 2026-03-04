@@ -21,18 +21,28 @@ const toIsoOrNow = (value: number): string => {
   return iso ?? new Date(0).toISOString();
 };
 
-export const normalizeJoplinTodos = (rawItems: JoplinRawTodo[]): TodoItem[] => {
-  if (rawItems.some((item) => item.encryption_applied !== 0)) {
+
+export const toTodoItem = (rawItem: JoplinRawTodo): TodoItem | null => {
+  if (rawItem.encryption_applied !== 0) {
     throw new EncryptedJoplinSyncError();
   }
 
-  return rawItems
-    .filter((item) => Number(item.is_todo) === 1)
-    .map((item) => ({
-      id: item.id,
-      title: item.title?.trim() || '(제목 없음)',
-      due: toIsoOrNull(item.todo_due),
-      completed: Number(item.todo_completed) > 0,
-      updatedTime: toIsoOrNow(item.updated_time),
-    }));
+  if (Number(rawItem.is_todo) !== 1) {
+    return null;
+  }
+
+  return {
+    id: rawItem.id,
+    title: rawItem.title?.trim() || '(제목 없음)',
+    due: toIsoOrNull(rawItem.todo_due),
+    completed: Number(rawItem.todo_completed) > 0,
+    updatedTime: toIsoOrNow(rawItem.updated_time),
+  };
 };
+
+export const normalizeJoplinTodos = (rawItems: JoplinRawTodo[]): TodoItem[] => {
+  return rawItems
+    .map(toTodoItem)
+    .filter((item): item is TodoItem => item !== null);
+};
+

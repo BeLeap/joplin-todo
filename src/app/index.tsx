@@ -22,6 +22,7 @@ import { publishTodosToWidget } from '@/features/widget/widget-bridge';
 import { createWidgetBridge } from '@/features/widget/widget-bridge-factory';
 import { getWidgetSnapshotState } from '@/features/widget/widget-state';
 import type { TodoItem } from '@/features/todo/types';
+import { sortTodosByDueDate } from '@/features/todo/sort';
 import { AsyncStorageTodoCache } from '@/storage/todo-cache';
 
 const createSyncSource = (token: string): OneDriveJoplinSource => new GraphOneDriveJoplinSource(token);
@@ -103,6 +104,7 @@ export default function HomeScreen() {
     setStatus('syncing');
     setErrorMessage(null);
     setSyncProgress(null);
+    setTodos([]);
 
     await publishTodosToWidget(widgetBridge, todos, lastSyncedAt, {
       state: getWidgetSnapshotState(todos.length, 'syncing'),
@@ -114,6 +116,14 @@ export default function HomeScreen() {
         maxRetries: 2,
         retryDelayMs: 500,
         onProgress: (progress) => setSyncProgress(progress),
+        onTodoParsed: (todo) => {
+          setTodos((previousTodos) =>
+            sortTodosByDueDate([
+              ...previousTodos.filter((previousTodo) => previousTodo.id !== todo.id),
+              todo,
+            ]),
+          );
+        },
       });
       setTodos(result.todos);
       setLastSyncedAt(result.syncedAt);
