@@ -8,6 +8,7 @@ const JOPLIN_SYNC_PAGE_SIZE = 200;
 const GRAPH_RETRYABLE_HTTP_STATUS = new Set([408, 429, 500, 502, 503, 504]);
 const DEFAULT_GRAPH_MAX_RETRIES = 3;
 const DEFAULT_GRAPH_RETRY_BASE_DELAY_MS = 300;
+const DEFAULT_GRAPH_REQUEST_TIMEOUT_MS = 15_000;
 
 type GraphDriveItem = {
   id: string;
@@ -200,6 +201,7 @@ export class GraphOneDriveJoplinSource implements OneDriveJoplinSource {
     private readonly retryOptions: {
       maxRetries?: number;
       baseDelayMs?: number;
+      requestTimeoutMs?: number;
     } = {},
   ) {}
 
@@ -221,24 +223,36 @@ export class GraphOneDriveJoplinSource implements OneDriveJoplinSource {
 
   private async graphFetch(url: string, context: Omit<GraphRequestContext, 'requestUrl'>) {
     const maxRetries = this.retryOptions.maxRetries ?? DEFAULT_GRAPH_MAX_RETRIES;
+    const requestTimeoutMs = this.retryOptions.requestTimeoutMs ?? DEFAULT_GRAPH_REQUEST_TIMEOUT_MS;
 
     for (let attempt = 0; attempt <= maxRetries; attempt += 1) {
       let response: Response;
+      const abortController = new AbortController();
+      const timeout = setTimeout(() => abortController.abort(), requestTimeoutMs);
+
       try {
         response = await fetch(url, {
           headers: {
             Authorization: `Bearer ${this.accessToken}`,
           },
+          signal: abortController.signal,
         });
       } catch (error) {
         if (attempt >= maxRetries) {
-          const message = error instanceof Error ? error.message : String(error);
+          const message =
+            error instanceof DOMException && error.name === 'AbortError'
+              ? `request-timeout(${requestTimeoutMs}ms)`
+              : error instanceof Error
+                ? error.message
+                : String(error);
           const detail = buildErrorDetail({ ...context, requestUrl: url }, [`reason=${message}`]);
           throw new OneDriveNetworkError(`OneDrive 요청 중 네트워크 예외 발생 | ${detail}`);
         }
 
         await this.sleep(this.getRetryDelayMs(attempt, null));
         continue;
+      } finally {
+        clearTimeout(timeout);
       }
 
       if (response.ok) {

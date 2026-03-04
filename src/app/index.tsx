@@ -66,10 +66,14 @@ const toUserFriendlyError = (error: unknown) => {
   }
 
   if (error instanceof OneDriveNetworkError) {
-    return `${error.message} 마지막 캐시를 표시합니다.`;
+    return `${error.message} | 마지막 캐시를 표시합니다.`;
   }
 
-  return '동기화에 실패했습니다. 마지막 캐시를 표시합니다.';
+  if (error instanceof Error) {
+    return `동기화에 실패했습니다: ${error.message} | 마지막 캐시를 표시합니다.`;
+  }
+
+  return `동기화에 실패했습니다: ${String(error)} | 마지막 캐시를 표시합니다.`;
 };
 
 export default function HomeScreen() {
