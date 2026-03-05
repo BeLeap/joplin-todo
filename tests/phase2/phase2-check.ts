@@ -84,6 +84,66 @@ class IncrementalSource implements OneDriveJoplinSource {
   }
 }
 
+
+class CheckpointSpyCache extends InMemoryTodoCache {
+  public saveCalls = 0;
+  public checkpoints: { modifiedSince: string | null; completed: number; parsedTodos: string[] }[] = [];
+
+  override async saveSyncCheckpoint(checkpoint: {
+    modifiedSince: string | null;
+    completed: number;
+    parsedTodos: import('@/features/todo/types').TodoItem[];
+  }) {
+    this.saveCalls += 1;
+    this.checkpoints.push({
+      modifiedSince: checkpoint.modifiedSince,
+      completed: checkpoint.completed,
+      parsedTodos: checkpoint.parsedTodos.map((todo) => todo.id),
+    });
+    await super.saveSyncCheckpoint(checkpoint);
+  }
+}
+
+class TwoItemSource implements OneDriveJoplinSource {
+  async listJoplinItems(
+    onProgress?: (progress: OneDriveSyncProgress) => void | Promise<void>,
+    onItem?: (item: JoplinRawTodo) => void | Promise<void>,
+  ): Promise<JoplinRawTodo[]> {
+    const items: JoplinRawTodo[] = [
+      {
+        id: 'todo-checkpoint-1',
+        title: 'checkpoint 1',
+        type_: 1,
+        is_todo: 1,
+        todo_due: 0,
+        todo_completed: 0,
+        updated_time: Date.now(),
+        encryption_applied: 0,
+      },
+      {
+        id: 'todo-checkpoint-2',
+        title: 'checkpoint 2',
+        type_: 1,
+        is_todo: 1,
+        todo_due: 0,
+        todo_completed: 0,
+        updated_time: Date.now(),
+        encryption_applied: 0,
+      },
+    ];
+
+    await onProgress?.({ phase: 'downloading', currentFileName: 'todo-checkpoint-1.md', completed: 0, total: 2 });
+    await onItem?.(items[0]!);
+    await onProgress?.({ phase: 'downloading', currentFileName: 'todo-checkpoint-1.md', completed: 1, total: 2 });
+
+    await onProgress?.({ phase: 'downloading', currentFileName: 'todo-checkpoint-2.md', completed: 1, total: 2 });
+    await onItem?.(items[1]!);
+    await onProgress?.({ phase: 'downloading', currentFileName: 'todo-checkpoint-2.md', completed: 2, total: 2 });
+
+    return items;
+  }
+}
+
 class ResumableSource implements OneDriveJoplinSource {
   private firstAttemptDone = false;
   public readonly resumeOptions: number[] = [];
@@ -300,6 +360,20 @@ encryption_applied: 0`);
     '재시도 시 이전 진행률(checkpoint)부터 이어받아야 합니다.',
   );
   assert.equal(resumedResult.todos.length, 2, '중단 이전에 파싱한 todo와 이후 todo를 함께 유지해야 합니다.');
+
+
+  const checkpointSpyCache = new CheckpointSpyCache();
+  await syncTodosFromOneDrive(new TwoItemSource(), checkpointSpyCache, {
+    maxRetries: 0,
+  });
+  assert.ok(
+    checkpointSpyCache.saveCalls >= 4,
+    '동기화 진행 중에는 앱이 강제 종료되어도 이어받을 수 있도록 checkpoint를 주기적으로 저장해야 합니다.',
+  );
+  assert.ok(
+    checkpointSpyCache.checkpoints.some((checkpoint) => checkpoint.completed === 1),
+    '중간 진행률(completed=1)이 checkpoint에 반영되어야 합니다.',
+  );
 
   const originalFetch = globalThis.fetch;
   let graphAttempt = 0;

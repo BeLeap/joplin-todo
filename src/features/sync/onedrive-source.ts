@@ -212,8 +212,8 @@ const toGraphError = async (response: Response, context: GraphRequestContext) =>
 export interface OneDriveJoplinSource {
   readonly incrementalMode?: 'modifiedSince';
   listJoplinItems(
-    onProgress?: (progress: OneDriveSyncProgress) => void,
-    onItem?: (item: JoplinRawTodo) => void,
+    onProgress?: (progress: OneDriveSyncProgress) => void | Promise<void>,
+    onItem?: (item: JoplinRawTodo) => void | Promise<void>,
     options?: {
       modifiedSince?: string | null;
       resumeFromCompleted?: number;
@@ -342,14 +342,14 @@ export class GraphOneDriveJoplinSource implements OneDriveJoplinSource {
   }
 
   async listJoplinItems(
-    onProgress?: (progress: OneDriveSyncProgress) => void,
-    onItem?: (item: JoplinRawTodo) => void,
+    onProgress?: (progress: OneDriveSyncProgress) => void | Promise<void>,
+    onItem?: (item: JoplinRawTodo) => void | Promise<void>,
     options: { modifiedSince?: string | null; resumeFromCompleted?: number } = {},
   ): Promise<JoplinRawTodo[]> {
     const files = await this.listJoplinFiles(options.modifiedSince);
     const completedBeforeStart = Math.max(0, options.resumeFromCompleted ?? 0);
     const filesToDownload = files.slice(completedBeforeStart);
-    onProgress?.({
+    await onProgress?.({
       phase: 'downloading',
       currentFileName: null,
       completed: completedBeforeStart,
@@ -359,7 +359,7 @@ export class GraphOneDriveJoplinSource implements OneDriveJoplinSource {
     const rawItems: (JoplinRawTodo | null)[] = [];
     for (const [offset, file] of filesToDownload.entries()) {
       const index = completedBeforeStart + offset;
-      onProgress?.({
+      await onProgress?.({
         phase: 'downloading',
         currentFileName: file.name,
         completed: index,
@@ -375,10 +375,10 @@ export class GraphOneDriveJoplinSource implements OneDriveJoplinSource {
       const parsedItem = parseJoplinMetadata(content);
       rawItems.push(parsedItem);
       if (parsedItem) {
-        onItem?.(parsedItem);
+        await onItem?.(parsedItem);
       }
 
-      onProgress?.({
+      await onProgress?.({
         phase: 'downloading',
         currentFileName: file.name,
         completed: index + 1,
