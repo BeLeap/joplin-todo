@@ -22,6 +22,7 @@ import { publishTodosToWidget } from '@/features/widget/widget-bridge';
 import { createWidgetBridge } from '@/features/widget/widget-bridge-factory';
 import { getWidgetSnapshotState } from '@/features/widget/widget-state';
 import type { TodoItem } from '@/features/todo/types';
+import { sortTodosByDueDate } from '@/features/todo/sort';
 import { AsyncStorageTodoCache } from '@/storage/todo-cache';
 
 const createSyncSource = (token: string): OneDriveJoplinSource => new GraphOneDriveJoplinSource(token);
@@ -65,10 +66,14 @@ const toUserFriendlyError = (error: unknown) => {
   }
 
   if (error instanceof OneDriveNetworkError) {
-    return `${error.message} 마지막 캐시를 표시합니다.`;
+    return `${error.message} | 마지막 캐시를 표시합니다.`;
   }
 
-  return '동기화에 실패했습니다. 마지막 캐시를 표시합니다.';
+  if (error instanceof Error) {
+    return `동기화에 실패했습니다: ${error.message} | 마지막 캐시를 표시합니다.`;
+  }
+
+  return `동기화에 실패했습니다: ${String(error)} | 마지막 캐시를 표시합니다.`;
 };
 
 export default function HomeScreen() {
@@ -79,6 +84,7 @@ export default function HomeScreen() {
   const [status, setStatus] = useState<SyncStatus>('idle');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [syncProgress, setSyncProgress] = useState<OneDriveSyncProgress | null>(null);
+  const [syncStatusDetail, setSyncStatusDetail] = useState<string | null>(null);
 
   const loadCachedTodos = useCallback(async () => {
     const snapshot = await cache.loadTodos();
@@ -97,23 +103,48 @@ export default function HomeScreen() {
     if (!token) {
       setStatus('error');
       setErrorMessage('OneDrive 로그인이 필요합니다.');
+      setSyncStatusDetail(null);
       return;
     }
 
     setStatus('syncing');
+    setSyncStatusDetail('동기화 준비 중 (인증 토큰 확인 완료)');
     setErrorMessage(null);
     setSyncProgress(null);
+    setTodos([]);
 
-    await publishTodosToWidget(widgetBridge, todos, lastSyncedAt, {
-      state: getWidgetSnapshotState(todos.length, 'syncing'),
+    const cachedSnapshot = await cache.loadTodos();
+    await publishTodosToWidget(widgetBridge, cachedSnapshot.todos, cachedSnapshot.lastSyncedAt, {
+      state: getWidgetSnapshotState(cachedSnapshot.todos.length, 'syncing'),
     });
 
     try {
+      setSyncStatusDetail('OneDrive 연결 중...');
       const source = createSyncSource(token);
       const result = await syncTodosFromOneDriveWithCacheFallback(source, cache, {
         maxRetries: 2,
         retryDelayMs: 500,
-        onProgress: (progress) => setSyncProgress(progress),
+        onProgress: (progress) => {
+          setSyncStatusDetail(
+            progress.phase === 'listing'
+              ? 'Joplin 원본 파일 목록 확인 중...'
+              : '파일을 내려받아 TODO를 파싱 중...',
+          );
+          setSyncProgress((previousProgress) => ({
+            ...progress,
+            currentFileName:
+              progress.currentFileName ??
+              (progress.phase === 'downloading' ? previousProgress?.currentFileName ?? null : null),
+          }));
+        },
+        onTodoParsed: (todo) => {
+          setTodos((previousTodos) =>
+            sortTodosByDueDate([
+              ...previousTodos.filter((previousTodo) => previousTodo.id !== todo.id),
+              todo,
+            ]),
+          );
+        },
       });
       setTodos(result.todos);
       setLastSyncedAt(result.syncedAt);
@@ -127,6 +158,7 @@ export default function HomeScreen() {
       setStatus(result.fromCache ? 'error' : 'success');
       setErrorMessage(friendlyError);
       setSyncProgress(null);
+      setSyncStatusDetail(result.fromCache ? '네트워크 오류로 캐시 결과를 표시 중' : null);
     } catch (error) {
       const friendlyError = toUserFriendlyError(error);
       await loadCachedTodos();
@@ -138,8 +170,9 @@ export default function HomeScreen() {
       setStatus('error');
       setErrorMessage(friendlyError);
       setSyncProgress(null);
+      setSyncStatusDetail('오류로 인해 서버 동기화를 중단하고 캐시 데이터를 복원함');
     }
-  }, [getValidAccessToken, lastSyncedAt, loadCachedTodos, todos]);
+  }, [getValidAccessToken, loadCachedTodos]);
 
   useEffect(() => {
     const initialize = async () => {
@@ -156,11 +189,13 @@ export default function HomeScreen() {
   const handleSignIn = useCallback(async () => {
     try {
       setErrorMessage(null);
+      setSyncStatusDetail(null);
       await signIn();
       await refreshTodos();
     } catch (error) {
       setStatus('error');
       setErrorMessage(toUserFriendlyError(error));
+      setSyncStatusDetail(null);
     }
   }, [refreshTodos, signIn]);
 
@@ -168,16 +203,22 @@ export default function HomeScreen() {
     await signOut();
     setStatus('idle');
     setErrorMessage(null);
+    setSyncStatusDetail(null);
   }, [signOut]);
 
   const statusMessage = useMemo(() => {
     switch (status) {
       case 'syncing': {
         if (!syncProgress) {
-          return '동기화 중...';
+          return `동기화 중... ${syncStatusDetail ?? '초기화 단계 진행 중...'}`;
         }
 
-        const { completed, total, currentFileName } = syncProgress;
+        const { phase, completed, total, currentFileName } = syncProgress;
+
+        if (phase === 'listing') {
+          return '동기화 중... 파일 목록을 확인하는 중';
+        }
+
         const progressLabel = `(${Math.min(completed, total)}/${total})`;
         const fileLabel = currentFileName ? ` ${currentFileName}` : '';
         return `동기화 중... ${progressLabel}${fileLabel}`;
@@ -185,11 +226,11 @@ export default function HomeScreen() {
       case 'success':
         return 'OneDrive 동기화 성공';
       case 'error':
-        return '오프라인/오류 상태 (캐시 표시)';
+        return errorMessage ? `오류 상태: ${errorMessage}` : '오프라인/오류 상태 (캐시 표시)';
       default:
         return '대기 중';
     }
-  }, [status, syncProgress]);
+  }, [errorMessage, status, syncProgress, syncStatusDetail]);
 
   return (
     <ThemedView style={styles.container}>

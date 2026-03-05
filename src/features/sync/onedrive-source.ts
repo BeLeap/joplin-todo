@@ -8,10 +8,12 @@ const JOPLIN_SYNC_PAGE_SIZE = 200;
 const GRAPH_RETRYABLE_HTTP_STATUS = new Set([408, 429, 500, 502, 503, 504]);
 const DEFAULT_GRAPH_MAX_RETRIES = 3;
 const DEFAULT_GRAPH_RETRY_BASE_DELAY_MS = 300;
+const DEFAULT_GRAPH_REQUEST_TIMEOUT_MS = 15_000;
 
 type GraphDriveItem = {
   id: string;
   name: string;
+  lastModifiedDateTime?: string;
   file?: Record<string, unknown>;
 };
 
@@ -22,17 +24,63 @@ type GraphListResponse = {
 
 const isJoplinItemFile = (name: string) => name.endsWith('.md');
 
-const parseIntegerField = (value: string | undefined, fallback = 0) => {
+const parseNumericOrDateField = (value: string | undefined, fallback = 0) => {
   if (!value) {
     return fallback;
   }
 
-  const parsed = Number.parseInt(value, 10);
-  if (!Number.isFinite(parsed)) {
+  const trimmed = value.trim();
+  if (!trimmed) {
     return fallback;
   }
 
-  return parsed;
+  const numeric = Number(trimmed);
+  if (Number.isFinite(numeric)) {
+    return numeric;
+  }
+
+  const parsedDate = Date.parse(trimmed);
+  if (Number.isFinite(parsedDate)) {
+    return parsedDate;
+  }
+
+  return fallback;
+};
+
+const parseIntegerField = (value: string | undefined, fallback = 0) =>
+  Math.trunc(parseNumericOrDateField(value, fallback));
+
+const JOPLIN_METADATA_KEYS = new Set([
+  'id',
+  'title',
+  'type_',
+  'is_todo',
+  'todo_due',
+  'todo_completed',
+  'updated_time',
+  'encryption_applied',
+]);
+
+const getMetadataKeyFromLine = (line: string) => {
+  const separator = line.indexOf(':');
+  if (separator <= 0) {
+    return null;
+  }
+
+  const key = line.slice(0, separator).trim();
+  if (!JOPLIN_METADATA_KEYS.has(key)) {
+    return null;
+  }
+
+  return key;
+};
+
+const isAbortError = (error: unknown) => {
+  if (!error || typeof error !== 'object') {
+    return false;
+  }
+
+  return 'name' in error && error.name === 'AbortError';
 };
 
 const parseJoplinMetadata = (content: string): JoplinRawTodo | null => {
@@ -41,39 +89,27 @@ const parseJoplinMetadata = (content: string): JoplinRawTodo | null => {
   const map = new Map<string, string>();
 
   let titleFromFirstLine = '';
-  let metadataLines = lines;
-
-  const firstLine = lines[0]?.trim() ?? '';
-  const embeddedIdIndex = firstLine.indexOf('id:');
-  if (embeddedIdIndex > 0) {
-    titleFromFirstLine = firstLine.slice(0, embeddedIdIndex).trim();
-    metadataLines = [firstLine.slice(embeddedIdIndex), ...lines.slice(1)];
-  } else {
-    const separator = firstLine.indexOf(':');
-    const firstLineLooksLikeMetadata =
-      separator > 0 && /^[a-zA-Z0-9_]+$/.test(firstLine.slice(0, separator).trim());
-
-    if (!firstLineLooksLikeMetadata) {
-      titleFromFirstLine = firstLine;
-      metadataLines = lines.slice(1);
+  for (const rawLine of lines) {
+    const trimmed = rawLine.trim();
+    if (!trimmed) {
+      continue;
     }
-  }
-
-  for (const line of metadataLines) {
-    if (!line.trim()) {
-      break;
-    }
-
-    const separator = line.indexOf(':');
-    if (separator <= 0) {
+    if (getMetadataKeyFromLine(trimmed)) {
       continue;
     }
 
-    const key = line.slice(0, separator).trim();
-    const value = line.slice(separator + 1).trim();
-    if (key) {
-      map.set(key, value);
+    titleFromFirstLine = trimmed;
+    break;
+  }
+
+  for (const line of lines) {
+    const key = getMetadataKeyFromLine(line);
+    if (!key) {
+      continue;
     }
+    const separator = line.indexOf(':');
+    const value = line.slice(separator + 1).trim();
+    map.set(key, value);
   }
 
   const id = map.get('id');
@@ -83,7 +119,7 @@ const parseJoplinMetadata = (content: string): JoplinRawTodo | null => {
 
   return {
     id,
-    title: titleFromFirstLine || map.get('title') || '',
+    title: map.get('title') || titleFromFirstLine || '',
     type_: parseIntegerField(map.get('type_')),
     is_todo: parseIntegerField(map.get('is_todo')),
     todo_due: parseIntegerField(map.get('todo_due')),
@@ -174,7 +210,14 @@ const toGraphError = async (response: Response, context: GraphRequestContext) =>
 };
 
 export interface OneDriveJoplinSource {
-  listJoplinItems(onProgress?: (progress: OneDriveSyncProgress) => void): Promise<JoplinRawTodo[]>;
+  readonly incrementalMode?: 'modifiedSince';
+  listJoplinItems(
+    onProgress?: (progress: OneDriveSyncProgress) => void,
+    onItem?: (item: JoplinRawTodo) => void,
+    options?: {
+      modifiedSince?: string | null;
+    },
+  ): Promise<JoplinRawTodo[]>;
 }
 
 export type OneDriveSyncProgress = {
@@ -185,11 +228,14 @@ export type OneDriveSyncProgress = {
 };
 
 export class GraphOneDriveJoplinSource implements OneDriveJoplinSource {
+  readonly incrementalMode = 'modifiedSince' as const;
+
   constructor(
     private readonly accessToken: string,
     private readonly retryOptions: {
       maxRetries?: number;
       baseDelayMs?: number;
+      requestTimeoutMs?: number;
     } = {},
   ) {}
 
@@ -211,24 +257,36 @@ export class GraphOneDriveJoplinSource implements OneDriveJoplinSource {
 
   private async graphFetch(url: string, context: Omit<GraphRequestContext, 'requestUrl'>) {
     const maxRetries = this.retryOptions.maxRetries ?? DEFAULT_GRAPH_MAX_RETRIES;
+    const requestTimeoutMs = this.retryOptions.requestTimeoutMs ?? DEFAULT_GRAPH_REQUEST_TIMEOUT_MS;
 
     for (let attempt = 0; attempt <= maxRetries; attempt += 1) {
       let response: Response;
+      const abortController = new AbortController();
+      const timeout = setTimeout(() => abortController.abort(), requestTimeoutMs);
+
       try {
         response = await fetch(url, {
           headers: {
             Authorization: `Bearer ${this.accessToken}`,
           },
+          signal: abortController.signal,
         });
       } catch (error) {
         if (attempt >= maxRetries) {
-          const message = error instanceof Error ? error.message : String(error);
+          const message =
+            isAbortError(error)
+              ? `request-timeout(${requestTimeoutMs}ms)`
+              : error instanceof Error
+                ? error.message
+                : String(error);
           const detail = buildErrorDetail({ ...context, requestUrl: url }, [`reason=${message}`]);
           throw new OneDriveNetworkError(`OneDrive 요청 중 네트워크 예외 발생 | ${detail}`);
         }
 
         await this.sleep(this.getRetryDelayMs(attempt, null));
         continue;
+      } finally {
+        clearTimeout(timeout);
       }
 
       if (response.ok) {
@@ -249,9 +307,11 @@ export class GraphOneDriveJoplinSource implements OneDriveJoplinSource {
     );
   }
 
-  private async listJoplinFiles() {
+  private async listJoplinFiles(modifiedSince?: string | null) {
     const files: GraphDriveItem[] = [];
     let nextLink = `${GRAPH_BASE_URL}${JOPLIN_FOLDER_PATH}:/children?$top=${JOPLIN_SYNC_PAGE_SIZE}`;
+    const modifiedSinceMs = modifiedSince ? Date.parse(modifiedSince) : Number.NaN;
+    const shouldFilterByModifiedSince = Number.isFinite(modifiedSinceMs);
 
     while (nextLink) {
       const response = await this.graphFetch(nextLink, {
@@ -260,15 +320,32 @@ export class GraphOneDriveJoplinSource implements OneDriveJoplinSource {
       });
       const body = (await response.json()) as GraphListResponse;
       const page = body.value?.filter((item) => item.file && isJoplinItemFile(item.name)) ?? [];
-      files.push(...page);
+      const filtered = shouldFilterByModifiedSince
+        ? page.filter((item) => {
+            const lastModifiedMs = item.lastModifiedDateTime
+              ? Date.parse(item.lastModifiedDateTime)
+              : Number.NaN;
+
+            if (!Number.isFinite(lastModifiedMs)) {
+              return true;
+            }
+
+            return lastModifiedMs > modifiedSinceMs;
+          })
+        : page;
+      files.push(...filtered);
       nextLink = body['@odata.nextLink'] ?? '';
     }
 
     return files;
   }
 
-  async listJoplinItems(onProgress?: (progress: OneDriveSyncProgress) => void): Promise<JoplinRawTodo[]> {
-    const files = await this.listJoplinFiles();
+  async listJoplinItems(
+    onProgress?: (progress: OneDriveSyncProgress) => void,
+    onItem?: (item: JoplinRawTodo) => void,
+    options: { modifiedSince?: string | null } = {},
+  ): Promise<JoplinRawTodo[]> {
+    const files = await this.listJoplinFiles(options.modifiedSince);
     onProgress?.({
       phase: 'downloading',
       currentFileName: null,
@@ -291,7 +368,11 @@ export class GraphOneDriveJoplinSource implements OneDriveJoplinSource {
         logicalPath: `${JOPLIN_FOLDER_PATH}/${file.name}`,
       });
       const content = await response.text();
-      rawItems.push(parseJoplinMetadata(content));
+      const parsedItem = parseJoplinMetadata(content);
+      rawItems.push(parsedItem);
+      if (parsedItem) {
+        onItem?.(parsedItem);
+      }
 
       onProgress?.({
         phase: 'downloading',

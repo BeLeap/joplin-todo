@@ -1,8 +1,9 @@
 import { sortTodosByDueDate } from '@/features/todo/sort';
+import type { TodoItem } from '@/features/todo/types';
 import type { TodoCache } from '@/storage/todo-cache';
 
 import { OneDriveNetworkError } from './errors';
-import { normalizeJoplinTodos } from './joplin-todo-normalizer';
+import { normalizeJoplinTodos, toTodoItem } from './joplin-todo-normalizer';
 import type { OneDriveJoplinSource, OneDriveSyncProgress } from './onedrive-source';
 import type { TodoSyncResult, TodoSyncWithFallbackResult } from './types';
 
@@ -10,6 +11,7 @@ type SyncOptions = {
   maxRetries?: number;
   retryDelayMs?: number;
   onProgress?: (progress: OneDriveSyncProgress) => void;
+  onTodoParsed?: (todo: TodoItem) => void;
 };
 
 const sleep = async (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -25,9 +27,27 @@ export const syncTodosFromOneDrive = async (
   let lastError: unknown;
   for (let attempt = 0; attempt <= maxRetries; attempt += 1) {
     try {
-      const rawItems = await source.listJoplinItems(options.onProgress);
+      const snapshot = await cache.loadTodos();
+      const rawItems = await source.listJoplinItems(options.onProgress, (item) => {
+        const todoItem = toTodoItem(item);
+        if (todoItem) {
+          options.onTodoParsed?.(todoItem);
+        }
+      }, {
+        modifiedSince: snapshot.lastSyncedAt,
+      });
       const normalizedTodos = normalizeJoplinTodos(rawItems);
-      const sortedTodos = sortTodosByDueDate(normalizedTodos);
+      const mergedTodos =
+        source.incrementalMode === 'modifiedSince' && snapshot.lastSyncedAt
+          ? (() => {
+              const byId = new Map(snapshot.todos.map((todo) => [todo.id, todo]));
+              normalizedTodos.forEach((todo) => {
+                byId.set(todo.id, todo);
+              });
+              return Array.from(byId.values());
+            })()
+          : normalizedTodos;
+      const sortedTodos = sortTodosByDueDate(mergedTodos);
       const syncedAt = new Date().toISOString();
 
       await cache.saveTodos(sortedTodos, syncedAt);

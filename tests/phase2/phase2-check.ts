@@ -46,6 +46,44 @@ class AlwaysFailNetworkSource implements OneDriveJoplinSource {
   }
 }
 
+class IncrementalSource implements OneDriveJoplinSource {
+  readonly incrementalMode = 'modifiedSince' as const;
+
+  async listJoplinItems(
+    _onProgress?: (progress: OneDriveSyncProgress) => void,
+    _onItem?: (item: JoplinRawTodo) => void,
+    options?: { modifiedSince?: string | null },
+  ) {
+    if (!options?.modifiedSince) {
+      return [
+        {
+          id: 'todo-existing',
+          title: 'Existing todo',
+          type_: 1,
+          is_todo: 1,
+          todo_due: 0,
+          todo_completed: 0,
+          updated_time: Date.now(),
+          encryption_applied: 0,
+        },
+      ];
+    }
+
+    return [
+      {
+        id: 'todo-new',
+        title: 'New todo',
+        type_: 1,
+        is_todo: 1,
+        todo_due: 0,
+        todo_completed: 0,
+        updated_time: Date.now(),
+        encryption_applied: 0,
+      },
+    ];
+  }
+}
+
 const run = async () => {
   const cache = new InMemoryTodoCache();
   const source = new MockOneDriveJoplinSource();
@@ -119,6 +157,11 @@ Body`);
   assert.equal(parsedFromMetadata?.id, 'meta-1');
   assert.equal(parsedFromMetadata?.title, 'Hello, World!', '첫 줄을 제목으로 파싱해야 합니다.');
   assert.equal(parsedFromMetadata?.todo_due, 0, '잘못된 숫자 필드는 0으로 보정해야 합니다.');
+  assert.equal(
+    parsedFromMetadata?.updated_time,
+    1700000000000,
+    'updated_time 숫자 필드를 파싱해야 합니다.',
+  );
 
   const parsedTodoFlagMetadata = __private__.parseJoplinMetadata(`id: meta-flag-1
 title: Metadata todo via flag
@@ -131,6 +174,30 @@ encryption_applied: 0
 
 Body`);
   assert.equal(parsedTodoFlagMetadata?.is_todo, 1, 'is_todo 필드를 파싱해야 합니다.');
+  assert.equal(
+    parsedTodoFlagMetadata?.title,
+    'Metadata todo via flag',
+    '메타데이터가 먼저 시작되는 파일은 title 필드를 제목으로 사용해야 합니다.',
+  );
+
+  const parsedFromBodyThenMetadata = __private__.parseJoplinMetadata(`Body line 1
+Body line 2
+
+id: body-meta-1
+type_: 1
+is_todo: 1
+todo_due: 0
+todo_completed: 0
+updated_time: 2026-03-04T05:18:43.454Z
+encryption_applied: 0`);
+  assert.ok(parsedFromBodyThenMetadata, '본문 뒤 메타데이터 형식도 파싱해야 합니다.');
+  assert.equal(parsedFromBodyThenMetadata?.id, 'body-meta-1');
+  assert.equal(parsedFromBodyThenMetadata?.is_todo, 1);
+  assert.equal(
+    parsedFromBodyThenMetadata?.updated_time,
+    Date.parse('2026-03-04T05:18:43.454Z'),
+    'ISO 시간 형식의 updated_time도 파싱해야 합니다.',
+  );
 
   const missingId = __private__.parseJoplinMetadata('title: no-id\ntype_: 13\n\nBody');
   assert.equal(missingId, null, 'id가 없는 메타데이터는 무시해야 합니다.');
@@ -156,6 +223,16 @@ Body`);
     fallbackResult.syncedAt,
     flakyResult.syncedAt,
     '캐시 fallback 시 마지막 성공 동기화 시각을 유지해야 합니다.',
+  );
+
+  const incrementalCache = new InMemoryTodoCache();
+  const incrementalSource = new IncrementalSource();
+  await syncTodosFromOneDrive(incrementalSource, incrementalCache);
+  const incrementalSynced = await syncTodosFromOneDrive(incrementalSource, incrementalCache);
+  assert.equal(
+    incrementalSynced.todos.length,
+    2,
+    '증분 동기화에서는 기존 캐시 todo와 변경 todo를 병합해야 합니다.',
   );
 
   const originalFetch = globalThis.fetch;
@@ -201,6 +278,7 @@ Body`,
           {
             id: 'item-1',
             name: 'todo.md',
+            lastModifiedDateTime: '2026-03-02T10:00:00.000Z',
             file: {},
           },
         ],
@@ -219,6 +297,90 @@ Body`,
   const graphItems = await graphSource.listJoplinItems();
   assert.equal(graphAttempt, 3, '429 응답은 지수 백오프로 재시도 후 성공해야 합니다.');
   assert.equal(graphItems.length, 1);
+
+  let incrementalDownloadCount = 0;
+  globalThis.fetch = (async (input) => {
+    const requestUrl =
+      typeof input === 'string'
+        ? input
+        : input instanceof URL
+          ? input.toString()
+          : input.url;
+
+    if (requestUrl.endsWith('/content')) {
+      incrementalDownloadCount += 1;
+      return new Response(
+        `changed item
+id: todo-incremental
+type_: 1
+is_todo: 1
+todo_due: 0
+todo_completed: 0
+updated_time: 1700000000000
+encryption_applied: 0
+
+Body`,
+        {
+          status: 200,
+          headers: { 'content-type': 'text/plain' },
+        },
+      );
+    }
+
+    return new Response(
+      JSON.stringify({
+        value: [
+          {
+            id: 'item-unchanged',
+            name: 'todo-unchanged.md',
+            lastModifiedDateTime: '2026-03-02T09:59:59.000Z',
+            file: {},
+          },
+          {
+            id: 'item-changed',
+            name: 'todo-changed.md',
+            lastModifiedDateTime: '2026-03-02T10:00:01.000Z',
+            file: {},
+          },
+        ],
+      }),
+      {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      },
+    );
+  }) as typeof fetch;
+
+  const incrementalItems = await graphSource.listJoplinItems(undefined, undefined, {
+    modifiedSince: '2026-03-02T10:00:00.000Z',
+  });
+  assert.equal(incrementalDownloadCount, 1, '마지막 동기화 이후 수정된 파일만 다운로드해야 합니다.');
+  assert.equal(incrementalItems.length, 1);
+  assert.equal(incrementalItems[0]?.id, 'todo-incremental');
+
+
+
+  globalThis.fetch = ((_: RequestInfo | URL, init?: RequestInit) =>
+    new Promise<Response>((_resolve, reject) => {
+      init?.signal?.addEventListener('abort', () => {
+        reject(new DOMException('The operation was aborted.', 'AbortError'));
+      });
+    })) as typeof fetch;
+
+  const timeoutSource = new GraphOneDriveJoplinSource('fake-token', {
+    maxRetries: 0,
+    requestTimeoutMs: 5,
+  });
+
+  await assert.rejects(
+    () => timeoutSource.listJoplinItems(),
+    (error: unknown) => {
+      assert.ok(error instanceof OneDriveNetworkError);
+      assert.match(error.message, /request-timeout\(5ms\)/);
+      return true;
+    },
+    'Graph 요청 타임아웃은 명확한 오류 메시지로 노출되어야 합니다.',
+  );
 
   globalThis.fetch = originalFetch;
 

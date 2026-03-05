@@ -1,15 +1,17 @@
-name: TypeScript Check
+name: Check
 
 on:
   pull_request:
     branches:
       - master
+      - develop
   push:
     branches:
       - master
+      - develop
 
 jobs:
-  tsc:
+  check:
     runs-on: ubuntu-latest
 
     steps:
@@ -21,9 +23,13 @@ jobs:
         with:
           node-version: 22
           cache: npm
+          cache-dependency-path: package-lock.json
 
       - name: Install dependencies
         run: npm ci
 
-      - name: Run type check
-        run: npx tsc --noEmit
+      - name: Install just
+        uses: taiki-e/install-action@just
+
+      - name: Run check via just
+        run: just check
