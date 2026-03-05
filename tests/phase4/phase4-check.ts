@@ -241,6 +241,9 @@ class MemoryTodoCache {
 
   private lastSyncedAt: string | null = null;
 
+  private checkpoint: { modifiedSince: string | null; completed: number; parsedTodos: TodoItem[] } | null =
+    null;
+
   async saveTodos(todos: TodoItem[], syncedAt: string) {
     this.todos = [...todos];
     this.lastSyncedAt = syncedAt;
@@ -256,6 +259,33 @@ class MemoryTodoCache {
   async clear() {
     this.todos = [];
     this.lastSyncedAt = null;
+    this.checkpoint = null;
+  }
+
+  async saveSyncCheckpoint(checkpoint: {
+    modifiedSince: string | null;
+    completed: number;
+    parsedTodos: TodoItem[];
+  }) {
+    this.checkpoint = {
+      ...checkpoint,
+      parsedTodos: [...checkpoint.parsedTodos],
+    };
+  }
+
+  async loadSyncCheckpoint() {
+    if (!this.checkpoint) {
+      return null;
+    }
+
+    return {
+      ...this.checkpoint,
+      parsedTodos: [...this.checkpoint.parsedTodos],
+    };
+  }
+
+  async clearSyncCheckpoint() {
+    this.checkpoint = null;
   }
 }
 
