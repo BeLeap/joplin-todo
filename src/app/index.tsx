@@ -205,30 +205,40 @@ export default function HomeScreen() {
     setSyncStatusDetail(null);
   }, [signOut]);
 
-  const statusMessage = useMemo(() => {
+  const statusHeadline = useMemo(() => {
     switch (status) {
       case 'syncing': {
-        if (!syncProgress) {
-          return `동기화 중... ${syncStatusDetail ?? '초기화 단계 진행 중...'}`;
-        }
-
-        const { phase, completed, total, currentFileName } = syncProgress;
-
-        if (phase === 'listing') {
-          return '동기화 중... 파일 목록을 확인하는 중';
-        }
-
-        const progressLabel = `(${Math.min(completed, total)}/${total})`;
-        const fileLabel = currentFileName ? ` ${currentFileName}` : '';
-        return `동기화 중... ${progressLabel}${fileLabel}`;
+        return '동기화 중...';
       }
       case 'success':
         return 'OneDrive 동기화 성공';
       case 'error':
-        return errorMessage ? `오류 상태: ${errorMessage}` : '오프라인/오류 상태 (캐시 표시)';
+        return '오프라인/오류 상태 (캐시 표시)';
       default:
         return '대기 중';
     }
+  }, [status]);
+
+  const statusDetail = useMemo(() => {
+    if (status === 'syncing') {
+      if (!syncProgress) {
+        return syncStatusDetail ?? '초기화 단계 진행 중...';
+      }
+
+      const { phase, completed, total, currentFileName } = syncProgress;
+      if (phase === 'listing') {
+        return '파일 목록을 확인하는 중';
+      }
+
+      const progressLabel = `진행률 ${Math.min(completed, total)}/${total}`;
+      return currentFileName ? `${progressLabel} · ${currentFileName}` : progressLabel;
+    }
+
+    if (status === 'error') {
+      return errorMessage ?? '오류가 발생했습니다.';
+    }
+
+    return null;
   }, [errorMessage, status, syncProgress, syncStatusDetail]);
 
   const statusBadgeStyle = useMemo(() => {
@@ -278,7 +288,16 @@ export default function HomeScreen() {
 
           <ThemedView type="backgroundElement" style={styles.statusCard}>
             <ThemedText type="defaultSemiBold">연결 상태</ThemedText>
-            <ThemedText>{statusMessage}</ThemedText>
+            <View style={styles.statusMessageBlock}>
+              <ThemedText type="defaultSemiBold">{statusHeadline}</ThemedText>
+              {statusDetail ? (
+                <ThemedText
+                  type="small"
+                  style={[styles.statusDetailText, status === 'error' ? styles.statusErrorDetailText : null]}>
+                  {statusDetail}
+                </ThemedText>
+              ) : null}
+            </View>
             <ThemedText type="small" themeColor="textSecondary">
               마지막 동기화: {formatSyncedAtLabel(lastSyncedAt)}
             </ThemedText>
@@ -401,6 +420,18 @@ const styles = StyleSheet.create({
     padding: Spacing.three,
     borderRadius: Spacing.four,
     gap: Spacing.two,
+  },
+  statusMessageBlock: {
+    gap: Spacing.one,
+  },
+  statusDetailText: {
+    color: '#2A5AC8',
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  statusErrorDetailText: {
+    color: '#B42424',
+    fontWeight: 600,
   },
   actionRow: {
     flexDirection: 'row',
