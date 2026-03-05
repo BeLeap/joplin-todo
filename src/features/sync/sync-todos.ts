@@ -32,16 +32,26 @@ export const syncTodosFromOneDrive = async (
   let lastError: unknown;
   for (let attempt = 0; attempt <= maxRetries; attempt += 1) {
     try {
-      const rawItems = await source.listJoplinItems((progress) => {
+      const rawItems = await source.listJoplinItems(async (progress) => {
         if (progress.phase === 'downloading') {
           resumeFromCompleted = Math.max(resumeFromCompleted, progress.completed);
+          await cache.saveSyncCheckpoint({
+            modifiedSince: snapshot.lastSyncedAt,
+            completed: resumeFromCompleted,
+            parsedTodos: Array.from(parsedTodoById.values()),
+          });
         }
-        options.onProgress?.(progress);
-      }, (item) => {
+        await options.onProgress?.(progress);
+      }, async (item) => {
         const todoItem = toTodoItem(item);
         if (todoItem) {
           parsedTodoById.set(todoItem.id, todoItem);
-          options.onTodoParsed?.(todoItem);
+          await cache.saveSyncCheckpoint({
+            modifiedSince: snapshot.lastSyncedAt,
+            completed: resumeFromCompleted,
+            parsedTodos: Array.from(parsedTodoById.values()),
+          });
+          await options.onTodoParsed?.(todoItem);
         }
       }, {
         modifiedSince: snapshot.lastSyncedAt,
