@@ -1,10 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
+import { BottomTabInset, Colors, MaxContentWidth, Spacing } from '@/constants/theme';
 import {
   EncryptedJoplinSyncError,
   OneDriveAuthError,
@@ -16,13 +16,14 @@ import {
   type OneDriveJoplinSource,
   type OneDriveSyncProgress,
 } from '@/features/sync/onedrive-source';
-import { useOneDriveAuth } from '@/features/sync/use-onedrive-auth';
 import { syncTodosFromOneDriveWithCacheFallback } from '@/features/sync/sync-todos';
-import { publishTodosToWidget } from '@/features/widget/widget-bridge';
-import { createWidgetBridge } from '@/features/widget/widget-bridge-factory';
-import { getWidgetSnapshotState } from '@/features/widget/widget-state';
-import type { TodoItem } from '@/features/todo/types';
 import { sortTodosByDueDate } from '@/features/todo/sort';
+import type { TodoItem } from '@/features/todo/types';
+import { useOneDriveAuth } from '@/features/sync/use-onedrive-auth';
+import { createWidgetBridge } from '@/features/widget/widget-bridge-factory';
+import { publishTodosToWidget } from '@/features/widget/widget-bridge';
+import { getWidgetSnapshotState } from '@/features/widget/widget-state';
+import { useTheme } from '@/hooks/use-theme';
 import { AsyncStorageTodoCache } from '@/storage/todo-cache';
 
 const createSyncSource = (token: string): OneDriveJoplinSource => new GraphOneDriveJoplinSource(token);
@@ -77,6 +78,7 @@ const toUserFriendlyError = (error: unknown) => {
 };
 
 export default function HomeScreen() {
+  const theme = useTheme();
   const { hasClientId, hasSession, isLoading: isAuthLoading, signIn, signOut, getValidAccessToken } =
     useOneDriveAuth();
   const [todos, setTodos] = useState<TodoItem[]>([]);
@@ -148,9 +150,7 @@ export default function HomeScreen() {
       });
       setTodos(result.todos);
       setLastSyncedAt(result.syncedAt);
-      const friendlyError = result.fromCache
-        ? '네트워크 문제로 마지막 캐시를 표시합니다.'
-        : null;
+      const friendlyError = result.fromCache ? '네트워크 문제로 마지막 캐시를 표시합니다.' : null;
       await publishTodosToWidget(widgetBridge, result.todos, result.syncedAt, {
         state: getWidgetSnapshotState(result.todos.length, result.fromCache ? 'error' : 'ready'),
         errorMessage: friendlyError,
@@ -184,7 +184,6 @@ export default function HomeScreen() {
 
     void initialize();
   }, [hasSession, loadCachedTodos, refreshTodos]);
-
 
   const handleSignIn = useCallback(async () => {
     try {
@@ -232,42 +231,93 @@ export default function HomeScreen() {
     }
   }, [errorMessage, status, syncProgress, syncStatusDetail]);
 
+  const statusBadgeStyle = useMemo(() => {
+    if (status === 'success') {
+      return { backgroundColor: '#E7F8EE', color: '#0C7A42' };
+    }
+
+    if (status === 'error') {
+      return { backgroundColor: '#FDECEC', color: '#B42424' };
+    }
+
+    if (status === 'syncing') {
+      return { backgroundColor: '#E8F0FF', color: '#2A5AC8' };
+    }
+
+    return {
+      backgroundColor: theme.backgroundElement,
+      color: theme.textSecondary,
+    };
+  }, [status, theme.backgroundElement, theme.textSecondary]);
+
+  const hasSignedInSession = hasSession || process.env.EXPO_PUBLIC_ONEDRIVE_ACCESS_TOKEN?.trim();
+
   return (
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
         <ScrollView contentContainerStyle={styles.scrollContent}>
-          <ThemedText type="title">Joplin TODO 위젯 (MVP)</ThemedText>
+          <ThemedView type="backgroundElement" style={styles.headerCard}>
+            <ThemedText type="smallBold" themeColor="textSecondary">
+              Joplin TODO Widget
+            </ThemedText>
+            <ThemedText style={styles.title}>오늘 할 일을 한눈에</ThemedText>
+            <ThemedText type="small" themeColor="textSecondary">
+              OneDrive에 저장된 Joplin TODO를 동기화해서 위젯과 앱에서 동일하게 확인하세요.
+            </ThemedText>
+            <View style={styles.kpiRow}>
+              <ThemedView type="background" style={styles.kpiChip}>
+                <ThemedText type="smallBold">할 일 {todos.length}개</ThemedText>
+              </ThemedView>
+              <ThemedView style={[styles.statusBadge, { backgroundColor: statusBadgeStyle.backgroundColor }]}>
+                <ThemedText type="smallBold" style={{ color: statusBadgeStyle.color }}>
+                  {status.toUpperCase()}
+                </ThemedText>
+              </ThemedView>
+            </View>
+          </ThemedView>
 
           <ThemedView type="backgroundElement" style={styles.statusCard}>
             <ThemedText type="defaultSemiBold">연결 상태</ThemedText>
             <ThemedText>{statusMessage}</ThemedText>
-            <ThemedText type="small">마지막 동기화: {formatSyncedAtLabel(lastSyncedAt)}</ThemedText>
+            <ThemedText type="small" themeColor="textSecondary">
+              마지막 동기화: {formatSyncedAtLabel(lastSyncedAt)}
+            </ThemedText>
 
-            {hasSession || process.env.EXPO_PUBLIC_ONEDRIVE_ACCESS_TOKEN?.trim() ? (
-              <>
-                <Pressable style={styles.refreshButton} onPress={() => void refreshTodos()}>
-                  <ThemedText type="link">수동 새로고침</ThemedText>
-                </Pressable>
-                {hasSession ? (
-                  <Pressable style={styles.refreshButton} onPress={() => void handleSignOut()}>
-                    <ThemedText type="link">로그아웃</ThemedText>
+            <View style={styles.actionRow}>
+              {hasSignedInSession ? (
+                <>
+                  <Pressable style={[styles.actionButton, styles.actionButtonPrimary]} onPress={() => void refreshTodos()}>
+                    <ThemedText type="smallBold" style={styles.primaryButtonText}>
+                      수동 새로고침
+                    </ThemedText>
                   </Pressable>
-                ) : null}
-              </>
-            ) : (
-              <Pressable
-                style={styles.refreshButton}
-                onPress={() => void handleSignIn()}
-                disabled={!hasClientId || isAuthLoading}
-              >
-                <ThemedText type="link">{hasClientId ? 'OneDrive 로그인' : 'Client ID 설정 필요'}</ThemedText>
-              </Pressable>
-            )}
+                  {hasSession ? (
+                    <Pressable style={[styles.actionButton, styles.actionButtonSecondary]} onPress={() => void handleSignOut()}>
+                      <ThemedText type="smallBold">로그아웃</ThemedText>
+                    </Pressable>
+                  ) : null}
+                </>
+              ) : (
+                <Pressable
+                  style={[styles.actionButton, styles.actionButtonPrimary]}
+                  onPress={() => void handleSignIn()}
+                  disabled={!hasClientId || isAuthLoading}>
+                  <ThemedText type="smallBold" style={styles.primaryButtonText}>
+                    {hasClientId ? 'OneDrive 로그인' : 'Client ID 설정 필요'}
+                  </ThemedText>
+                </Pressable>
+              )}
+            </View>
 
             {errorMessage ? (
-              <ThemedText type="small" themeColor="textSecondary">
-                {errorMessage}
-              </ThemedText>
+              <ThemedView style={styles.errorBanner}>
+                <ThemedText type="smallBold" style={styles.errorText}>
+                  오류 발생
+                </ThemedText>
+                <ThemedText type="small" style={styles.errorText}>
+                  {errorMessage}
+                </ThemedText>
+              </ThemedView>
             ) : null}
           </ThemedView>
 
@@ -275,16 +325,26 @@ export default function HomeScreen() {
             <ThemedText type="subtitle">TODO 목록</ThemedText>
             {todos.length === 0 ? (
               <ThemedView type="backgroundElement" style={styles.todoCard}>
-                <ThemedText type="small">표시할 TODO가 없습니다.</ThemedText>
+                <ThemedText type="small" themeColor="textSecondary">
+                  표시할 TODO가 없습니다.
+                </ThemedText>
               </ThemedView>
             ) : (
               todos.map((todo) => (
                 <ThemedView key={todo.id} type="backgroundElement" style={styles.todoCard}>
                   <ThemedText type="defaultSemiBold">{todo.title}</ThemedText>
-                  <ThemedText type="small">{formatDueLabel(todo.due)}</ThemedText>
                   <ThemedText type="small" themeColor="textSecondary">
-                    {todo.completed ? '완료됨' : '진행중'}
+                    {formatDueLabel(todo.due)}
                   </ThemedText>
+                  <ThemedView
+                    style={[
+                      styles.todoStatus,
+                      { backgroundColor: todo.completed ? '#E7F8EE' : Colors.light.backgroundSelected },
+                    ]}>
+                    <ThemedText type="smallBold" style={{ color: todo.completed ? '#0C7A42' : '#244A8F' }}>
+                      {todo.completed ? '완료됨' : '진행중'}
+                    </ThemedText>
+                  </ThemedView>
                 </ThemedView>
               ))
             )}
@@ -311,16 +371,64 @@ const styles = StyleSheet.create({
     gap: Spacing.three,
     paddingVertical: Spacing.four,
   },
+  headerCard: {
+    borderRadius: Spacing.four,
+    gap: Spacing.two,
+    padding: Spacing.three,
+  },
+  title: {
+    fontSize: 28,
+    lineHeight: 36,
+    fontWeight: 700,
+  },
+  kpiRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two,
+    marginTop: Spacing.one,
+  },
+  kpiChip: {
+    borderRadius: 999,
+    paddingHorizontal: Spacing.three,
+    paddingVertical: Spacing.one,
+  },
+  statusBadge: {
+    borderRadius: 999,
+    paddingHorizontal: Spacing.three,
+    paddingVertical: Spacing.one,
+  },
   statusCard: {
     padding: Spacing.three,
     borderRadius: Spacing.four,
     gap: Spacing.two,
   },
-  refreshButton: {
-    alignSelf: 'flex-start',
+  actionRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Spacing.two,
+  },
+  actionButton: {
+    borderRadius: 999,
     paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.one,
+    paddingVertical: Spacing.two,
+  },
+  actionButtonPrimary: {
+    backgroundColor: '#2A5AC8',
+  },
+  actionButtonSecondary: {
+    backgroundColor: '#E5E7EB',
+  },
+  primaryButtonText: {
+    color: '#F8FAFC',
+  },
+  errorBanner: {
+    backgroundColor: '#FDECEC',
     borderRadius: Spacing.three,
+    padding: Spacing.two,
+    gap: Spacing.one,
+  },
+  errorText: {
+    color: '#B42424',
   },
   listSection: {
     gap: Spacing.two,
@@ -329,5 +437,12 @@ const styles = StyleSheet.create({
     padding: Spacing.three,
     borderRadius: Spacing.four,
     gap: Spacing.one,
+  },
+  todoStatus: {
+    alignSelf: 'flex-start',
+    borderRadius: 999,
+    paddingHorizontal: Spacing.two,
+    paddingVertical: Spacing.one,
+    marginTop: Spacing.one,
   },
 });
