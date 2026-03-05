@@ -24,17 +24,55 @@ type GraphListResponse = {
 
 const isJoplinItemFile = (name: string) => name.endsWith('.md');
 
-const parseIntegerField = (value: string | undefined, fallback = 0) => {
+const parseNumericOrDateField = (value: string | undefined, fallback = 0) => {
   if (!value) {
     return fallback;
   }
 
-  const parsed = Number.parseInt(value, 10);
-  if (!Number.isFinite(parsed)) {
+  const trimmed = value.trim();
+  if (!trimmed) {
     return fallback;
   }
 
-  return parsed;
+  const numeric = Number(trimmed);
+  if (Number.isFinite(numeric)) {
+    return numeric;
+  }
+
+  const parsedDate = Date.parse(trimmed);
+  if (Number.isFinite(parsedDate)) {
+    return parsedDate;
+  }
+
+  return fallback;
+};
+
+const parseIntegerField = (value: string | undefined, fallback = 0) =>
+  Math.trunc(parseNumericOrDateField(value, fallback));
+
+const JOPLIN_METADATA_KEYS = new Set([
+  'id',
+  'title',
+  'type_',
+  'is_todo',
+  'todo_due',
+  'todo_completed',
+  'updated_time',
+  'encryption_applied',
+]);
+
+const getMetadataKeyFromLine = (line: string) => {
+  const separator = line.indexOf(':');
+  if (separator <= 0) {
+    return null;
+  }
+
+  const key = line.slice(0, separator).trim();
+  if (!JOPLIN_METADATA_KEYS.has(key)) {
+    return null;
+  }
+
+  return key;
 };
 
 const isAbortError = (error: unknown) => {
@@ -51,39 +89,27 @@ const parseJoplinMetadata = (content: string): JoplinRawTodo | null => {
   const map = new Map<string, string>();
 
   let titleFromFirstLine = '';
-  let metadataLines = lines;
-
-  const firstLine = lines[0]?.trim() ?? '';
-  const embeddedIdIndex = firstLine.indexOf('id:');
-  if (embeddedIdIndex > 0) {
-    titleFromFirstLine = firstLine.slice(0, embeddedIdIndex).trim();
-    metadataLines = [firstLine.slice(embeddedIdIndex), ...lines.slice(1)];
-  } else {
-    const separator = firstLine.indexOf(':');
-    const firstLineLooksLikeMetadata =
-      separator > 0 && /^[a-zA-Z0-9_]+$/.test(firstLine.slice(0, separator).trim());
-
-    if (!firstLineLooksLikeMetadata) {
-      titleFromFirstLine = firstLine;
-      metadataLines = lines.slice(1);
+  for (const rawLine of lines) {
+    const trimmed = rawLine.trim();
+    if (!trimmed) {
+      continue;
     }
-  }
-
-  for (const line of metadataLines) {
-    if (!line.trim()) {
-      break;
-    }
-
-    const separator = line.indexOf(':');
-    if (separator <= 0) {
+    if (getMetadataKeyFromLine(trimmed)) {
       continue;
     }
 
-    const key = line.slice(0, separator).trim();
-    const value = line.slice(separator + 1).trim();
-    if (key) {
-      map.set(key, value);
+    titleFromFirstLine = trimmed;
+    break;
+  }
+
+  for (const line of lines) {
+    const key = getMetadataKeyFromLine(line);
+    if (!key) {
+      continue;
     }
+    const separator = line.indexOf(':');
+    const value = line.slice(separator + 1).trim();
+    map.set(key, value);
   }
 
   const id = map.get('id');
@@ -93,7 +119,7 @@ const parseJoplinMetadata = (content: string): JoplinRawTodo | null => {
 
   return {
     id,
-    title: titleFromFirstLine || map.get('title') || '',
+    title: map.get('title') || titleFromFirstLine || '',
     type_: parseIntegerField(map.get('type_')),
     is_todo: parseIntegerField(map.get('is_todo')),
     todo_due: parseIntegerField(map.get('todo_due')),
