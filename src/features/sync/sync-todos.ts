@@ -23,34 +23,52 @@ export const syncTodosFromOneDrive = async (
 ): Promise<TodoSyncResult> => {
   const maxRetries = options.maxRetries ?? 1;
   const retryDelayMs = options.retryDelayMs ?? 500;
+  const snapshot = await cache.loadTodos();
+  const checkpoint = await cache.loadSyncCheckpoint();
+  const canResume = checkpoint?.modifiedSince === snapshot.lastSyncedAt;
+  const parsedTodoById = new Map((canResume ? checkpoint?.parsedTodos : []).map((todo) => [todo.id, todo]));
+  let resumeFromCompleted = canResume ? checkpoint?.completed ?? 0 : 0;
 
   let lastError: unknown;
   for (let attempt = 0; attempt <= maxRetries; attempt += 1) {
     try {
-      const snapshot = await cache.loadTodos();
-      const rawItems = await source.listJoplinItems(options.onProgress, (item) => {
+      const rawItems = await source.listJoplinItems((progress) => {
+        if (progress.phase === 'downloading') {
+          resumeFromCompleted = Math.max(resumeFromCompleted, progress.completed);
+        }
+        options.onProgress?.(progress);
+      }, (item) => {
         const todoItem = toTodoItem(item);
         if (todoItem) {
+          parsedTodoById.set(todoItem.id, todoItem);
           options.onTodoParsed?.(todoItem);
         }
       }, {
         modifiedSince: snapshot.lastSyncedAt,
+        resumeFromCompleted,
       });
+      const parsedTodos = Array.from(parsedTodoById.values());
       const normalizedTodos = normalizeJoplinTodos(rawItems);
+      const fetchedById = new Map(normalizedTodos.map((todo) => [todo.id, todo]));
+      parsedTodos.forEach((todo) => {
+        fetchedById.set(todo.id, todo);
+      });
+      const fetchedTodos = Array.from(fetchedById.values());
       const mergedTodos =
         source.incrementalMode === 'modifiedSince' && snapshot.lastSyncedAt
           ? (() => {
               const byId = new Map(snapshot.todos.map((todo) => [todo.id, todo]));
-              normalizedTodos.forEach((todo) => {
+              fetchedTodos.forEach((todo) => {
                 byId.set(todo.id, todo);
               });
               return Array.from(byId.values());
             })()
-          : normalizedTodos;
+          : fetchedTodos;
       const sortedTodos = sortTodosByDueDate(mergedTodos);
       const syncedAt = new Date().toISOString();
 
       await cache.saveTodos(sortedTodos, syncedAt);
+      await cache.clearSyncCheckpoint();
 
       return {
         todos: sortedTodos,
@@ -59,6 +77,11 @@ export const syncTodosFromOneDrive = async (
       };
     } catch (error) {
       lastError = error;
+      await cache.saveSyncCheckpoint({
+        modifiedSince: snapshot.lastSyncedAt,
+        completed: resumeFromCompleted,
+        parsedTodos: Array.from(parsedTodoById.values()),
+      });
       if (!(error instanceof OneDriveNetworkError) || attempt >= maxRetries) {
         throw error;
       }

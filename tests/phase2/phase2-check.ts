@@ -84,6 +84,52 @@ class IncrementalSource implements OneDriveJoplinSource {
   }
 }
 
+class ResumableSource implements OneDriveJoplinSource {
+  private firstAttemptDone = false;
+  public readonly resumeOptions: number[] = [];
+
+  async listJoplinItems(
+    onProgress?: (progress: OneDriveSyncProgress) => void,
+    onItem?: (item: JoplinRawTodo) => void,
+    options?: { modifiedSince?: string | null; resumeFromCompleted?: number },
+  ): Promise<JoplinRawTodo[]> {
+    const resumeFromCompleted = options?.resumeFromCompleted ?? 0;
+    this.resumeOptions.push(resumeFromCompleted);
+
+    if (!this.firstAttemptDone) {
+      this.firstAttemptDone = true;
+      onProgress?.({ phase: 'downloading', currentFileName: 'todo-1.md', completed: 0, total: 2 });
+      onItem?.({
+        id: 'todo-resume-1',
+        title: 'Resume 1',
+        type_: 1,
+        is_todo: 1,
+        todo_due: 0,
+        todo_completed: 0,
+        updated_time: Date.now(),
+        encryption_applied: 0,
+      });
+      onProgress?.({ phase: 'downloading', currentFileName: 'todo-1.md', completed: 1, total: 2 });
+      throw new OneDriveNetworkError('download interrupted');
+    }
+
+    assert.equal(resumeFromCompleted, 1, '재시작 시 완료한 파일 수부터 이어받아야 합니다.');
+
+    return [
+      {
+        id: 'todo-resume-2',
+        title: 'Resume 2',
+        type_: 1,
+        is_todo: 1,
+        todo_due: 0,
+        todo_completed: 0,
+        updated_time: Date.now(),
+        encryption_applied: 0,
+      },
+    ];
+  }
+}
+
 const run = async () => {
   const cache = new InMemoryTodoCache();
   const source = new MockOneDriveJoplinSource();
@@ -234,6 +280,26 @@ encryption_applied: 0`);
     2,
     '증분 동기화에서는 기존 캐시 todo와 변경 todo를 병합해야 합니다.',
   );
+
+  const resumableCache = new InMemoryTodoCache();
+  const resumableSource = new ResumableSource();
+  await assert.rejects(
+    () =>
+      syncTodosFromOneDrive(resumableSource, resumableCache, {
+        maxRetries: 0,
+      }),
+    OneDriveNetworkError,
+    '중단된 동기화는 네트워크 오류를 그대로 드러내야 합니다.',
+  );
+  const resumedResult = await syncTodosFromOneDrive(resumableSource, resumableCache, {
+    maxRetries: 0,
+  });
+  assert.deepEqual(
+    resumableSource.resumeOptions,
+    [0, 1],
+    '재시도 시 이전 진행률(checkpoint)부터 이어받아야 합니다.',
+  );
+  assert.equal(resumedResult.todos.length, 2, '중단 이전에 파싱한 todo와 이후 todo를 함께 유지해야 합니다.');
 
   const originalFetch = globalThis.fetch;
   let graphAttempt = 0;
