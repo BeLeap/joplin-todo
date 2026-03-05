@@ -27,16 +27,6 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Cache Expo/EAS local build data
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.eas
-            ~/.expo
-          key: ${{ runner.os }}-expo-eas-${{ hashFiles('package-lock.json', 'eas.json', 'app.json', 'app.config.*') }}
-          restore-keys: |
-            ${{ runner.os }}-expo-eas-
-
       - name: Generate Android project (Expo prebuild)
         run: npx expo prebuild --platform android --non-interactive --no-install
 
@@ -48,11 +38,16 @@ jobs:
           # Safe now because prebuild creates android/gradle files before setup-java cache scan.
           cache: gradle
 
-      - name: Build release APK via EAS CLI
-        env:
-          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
-          EAS_LOCAL_BUILD_SKIP_CLEANUP: 1
-        run: npx eas-cli@latest build --platform android --profile preview --local --output app-release.apk
+      - name: Grant execute permission for Gradle wrapper
+        run: chmod +x android/gradlew
+
+      - name: Build release APK via Gradle
+        run: |
+          cd android
+          ./gradlew :app:assembleRelease
+
+      - name: Copy APK artifact
+        run: cp android/app/build/outputs/apk/release/app-release.apk app-release.apk
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
