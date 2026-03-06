@@ -87,6 +87,15 @@ export default function HomeScreen() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [syncProgress, setSyncProgress] = useState<OneDriveSyncProgress | null>(null);
   const [syncStatusDetail, setSyncStatusDetail] = useState<string | null>(null);
+  const [hideCompleted, setHideCompleted] = useState<boolean>(false);
+
+  const visibleTodos = useMemo(() => {
+    if (!hideCompleted) {
+      return todos;
+    }
+
+    return todos.filter((todo) => !todo.completed);
+  }, [hideCompleted, todos]);
 
   const loadCachedTodos = useCallback(async () => {
     const snapshot = await cache.loadTodos();
@@ -277,7 +286,7 @@ export default function HomeScreen() {
             </ThemedText>
             <View style={styles.kpiRow}>
               <ThemedView type="background" style={styles.kpiChip}>
-                <ThemedText type="smallBold">항목 {todos.length}개</ThemedText>
+                <ThemedText type="smallBold">항목 {visibleTodos.length}개</ThemedText>
               </ThemedView>
               <ThemedView style={[styles.statusBadge, { backgroundColor: statusBadgeStyle.backgroundColor }]}>
                 <ThemedText type="smallBold" style={{ color: statusBadgeStyle.color }}>
@@ -342,15 +351,28 @@ export default function HomeScreen() {
           </ThemedView>
 
           <ThemedView style={styles.listSection}>
-            <ThemedText type="subtitle">목록</ThemedText>
-            {todos.length === 0 ? (
+            <View style={styles.listHeaderRow}>
+              <ThemedText type="subtitle">목록</ThemedText>
+              <Pressable
+                style={[styles.filterChip, hideCompleted ? styles.filterChipActive : null]}
+                onPress={() => setHideCompleted((previous) => !previous)}>
+                <ThemedText
+                  type="smallBold"
+                  style={hideCompleted ? styles.filterChipTextActive : styles.filterChipTextInactive}>
+                  {hideCompleted ? '완료됨 숨김 켜짐' : '완료됨 숨김 꺼짐'}
+                </ThemedText>
+              </Pressable>
+            </View>
+            {visibleTodos.length === 0 ? (
               <ThemedView type="backgroundElement" style={styles.todoCard}>
                 <ThemedText type="small" themeColor="textSecondary">
-                  표시할 항목이 없습니다.
+                  {hideCompleted
+                    ? '완료되지 않은 항목이 없습니다. (완료됨 숨김 옵션이 켜져 있습니다.)'
+                    : '표시할 항목이 없습니다.'}
                 </ThemedText>
               </ThemedView>
             ) : (
-              todos.map((todo) => (
+              visibleTodos.map((todo) => (
                 <ThemedView key={todo.id} type="backgroundElement" style={styles.todoCard}>
                   <ThemedText type="defaultSemiBold">{todo.title}</ThemedText>
                   <ThemedText type="small" themeColor="textSecondary">
@@ -464,6 +486,27 @@ const styles = StyleSheet.create({
   },
   listSection: {
     gap: Spacing.two,
+  },
+  listHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: Spacing.two,
+  },
+  filterChip: {
+    borderRadius: 999,
+    paddingHorizontal: Spacing.two,
+    paddingVertical: Spacing.one,
+    backgroundColor: '#E5E7EB',
+  },
+  filterChipActive: {
+    backgroundColor: '#2A5AC8',
+  },
+  filterChipTextInactive: {
+    color: '#334155',
+  },
+  filterChipTextActive: {
+    color: '#F8FAFC',
   },
   todoCard: {
     padding: Spacing.three,
