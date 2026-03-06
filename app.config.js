@@ -1,5 +1,4 @@
 const appJson = require('./app.json');
-const { execSync } = require('node:child_process');
 
 const LIVE_ANDROID_PACKAGE = 'dev.beleap.joplintodo';
 const ALPHA_ANDROID_PACKAGE = 'dev.beleap.joplintodo.alpha';
@@ -7,7 +6,7 @@ const ALPHA_ANDROID_PACKAGE = 'dev.beleap.joplintodo.alpha';
 module.exports = ({ config }) => {
   const branchName = process.env.EAS_BUILD_GIT_BRANCH || process.env.GIT_BRANCH || '';
   const shouldUseAlphaPackage = branchName === 'develop';
-  const version = resolveHeadverVersion(appJson.expo.version);
+  const version = resolveTagNameVersion();
 
   return {
     ...appJson.expo,
@@ -27,63 +26,16 @@ module.exports = ({ config }) => {
   };
 };
 
-function resolveHeadverVersion(baseVersion) {
-  const head = parseHead(baseVersion);
-  const yearWeek = getIsoYearWeek(new Date());
-  const build = resolveBuildNumber();
+function resolveTagNameVersion() {
+  const tagName = process.env.TAG_NAME;
 
-  return `${head}.${yearWeek}.${build}`;
-}
-
-function parseHead(baseVersion) {
-  const matched = /^(\d+)\./.exec(baseVersion);
-
-  if (!matched) {
-    throw new Error(
-      `HeadVer 계산 실패: app.json expo.version("${baseVersion}")에서 head(major)를 읽을 수 없습니다.`,
-    );
+  if (!tagName) {
+    throw new Error('버전 계산 실패: TAG_NAME 환경변수가 비어 있습니다.');
   }
 
-  return matched[1];
-}
-
-function resolveBuildNumber() {
-  const envBuildNumber = process.env.EAS_BUILD_NUMBER || process.env.BUILD_NUMBER;
-
-  if (envBuildNumber) {
-    if (!/^\d+$/.test(envBuildNumber)) {
-      throw new Error(
-        `HeadVer 계산 실패: EAS_BUILD_NUMBER/BUILD_NUMBER 값이 숫자가 아닙니다("${envBuildNumber}").`,
-      );
-    }
-
-    return envBuildNumber;
+  if (!/^\d+\.\d+\.\d+$/.test(tagName)) {
+    throw new Error(`버전 계산 실패: TAG_NAME 값 형식이 잘못되었습니다("${tagName}").`);
   }
 
-  try {
-    const gitBuildNumber = execSync('git rev-list --count HEAD', { stdio: ['ignore', 'pipe', 'pipe'] })
-      .toString()
-      .trim();
-
-    if (!/^\d+$/.test(gitBuildNumber)) {
-      throw new Error(`git rev-list 결과가 숫자가 아닙니다("${gitBuildNumber}").`);
-    }
-
-    return gitBuildNumber;
-  } catch (error) {
-    throw new Error(`HeadVer 계산 실패: 빌드 번호를 구할 수 없습니다. ${error.message}`);
-  }
-}
-
-function getIsoYearWeek(date) {
-  const utcDate = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
-  const day = utcDate.getUTCDay() || 7;
-
-  utcDate.setUTCDate(utcDate.getUTCDate() + 4 - day);
-
-  const isoYear = utcDate.getUTCFullYear();
-  const yearStart = new Date(Date.UTC(isoYear, 0, 1));
-  const week = Math.ceil(((utcDate - yearStart) / 86400000 + 1) / 7);
-
-  return `${String(isoYear).slice(-2)}${String(week).padStart(2, '0')}`;
+  return tagName;
 }
