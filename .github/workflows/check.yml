@@ -28,6 +28,17 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Compute TAG_NAME for checks
+        run: |
+          TAG_NAME=$(./scripts/compute-headver.js)
+          if [ -z "$TAG_NAME" ]; then
+            echo "::error::compute-headver.js가 비어 있는 TAG_NAME을 반환했습니다."
+            exit 1
+          fi
+
+          echo "TAG_NAME=$TAG_NAME" >> "$GITHUB_ENV"
+          echo "Using TAG_NAME=$TAG_NAME"
+
       - name: Install just
         uses: taiki-e/install-action@just
 
