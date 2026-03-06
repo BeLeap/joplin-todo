@@ -87,6 +87,7 @@ export default function HomeScreen() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [syncProgress, setSyncProgress] = useState<OneDriveSyncProgress | null>(null);
   const [syncStatusDetail, setSyncStatusDetail] = useState<string | null>(null);
+  const [hideCompleted, setHideCompleted] = useState(false);
 
   const loadCachedTodos = useCallback(async () => {
     const snapshot = await cache.loadTodos();
@@ -262,6 +263,10 @@ export default function HomeScreen() {
   }, [status, theme.backgroundElement, theme.textSecondary]);
 
   const hasSignedInSession = hasSession || process.env.EXPO_PUBLIC_ONEDRIVE_ACCESS_TOKEN?.trim();
+  const visibleTodos = useMemo(
+    () => (hideCompleted ? todos.filter((todo) => !todo.completed) : todos),
+    [hideCompleted, todos],
+  );
 
   return (
     <ThemedView style={styles.container}>
@@ -342,15 +347,24 @@ export default function HomeScreen() {
           </ThemedView>
 
           <ThemedView style={styles.listSection}>
-            <ThemedText type="subtitle">TODO 목록</ThemedText>
-            {todos.length === 0 ? (
+            <View style={styles.listHeaderRow}>
+              <ThemedText type="subtitle">TODO 목록</ThemedText>
+              <Pressable
+                style={[styles.filterButton, hideCompleted ? styles.filterButtonActive : null]}
+                onPress={() => setHideCompleted((previous) => !previous)}>
+                <ThemedText type="smallBold" style={hideCompleted ? styles.filterButtonTextActive : null}>
+                  완료됨 숨기기
+                </ThemedText>
+              </Pressable>
+            </View>
+            {visibleTodos.length === 0 ? (
               <ThemedView type="backgroundElement" style={styles.todoCard}>
                 <ThemedText type="small" themeColor="textSecondary">
-                  표시할 TODO가 없습니다.
+                  {hideCompleted ? '표시할 진행중 TODO가 없습니다.' : '표시할 TODO가 없습니다.'}
                 </ThemedText>
               </ThemedView>
             ) : (
-              todos.map((todo) => (
+              visibleTodos.map((todo) => (
                 <ThemedView key={todo.id} type="backgroundElement" style={styles.todoCard}>
                   <ThemedText type="defaultSemiBold">{todo.title}</ThemedText>
                   <ThemedText type="small" themeColor="textSecondary">
@@ -464,6 +478,27 @@ const styles = StyleSheet.create({
   },
   listSection: {
     gap: Spacing.two,
+  },
+  listHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: Spacing.two,
+  },
+  filterButton: {
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    paddingHorizontal: Spacing.two,
+    paddingVertical: Spacing.one,
+    backgroundColor: '#FFFFFF',
+  },
+  filterButtonActive: {
+    borderColor: '#2A5AC8',
+    backgroundColor: '#E8F0FF',
+  },
+  filterButtonTextActive: {
+    color: '#1D4ED8',
   },
   todoCard: {
     padding: Spacing.three,
