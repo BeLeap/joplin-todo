@@ -269,15 +269,15 @@ export default function HomeScreen() {
         <ScrollView contentContainerStyle={styles.scrollContent}>
           <ThemedView type="backgroundElement" style={styles.headerCard}>
             <ThemedText type="smallBold" themeColor="textSecondary">
-              Joplin TODO Widget
+              Joplin Widget
             </ThemedText>
             <ThemedText style={styles.title}>오늘 할 일을 한눈에</ThemedText>
             <ThemedText type="small" themeColor="textSecondary">
-              OneDrive에 저장된 Joplin TODO를 동기화해서 위젯과 앱에서 동일하게 확인하세요.
+              OneDrive에 저장된 Joplin 항목을 동기화해 위젯과 앱에서 확인하세요.
             </ThemedText>
             <View style={styles.kpiRow}>
               <ThemedView type="background" style={styles.kpiChip}>
-                <ThemedText type="smallBold">할 일 {todos.length}개</ThemedText>
+                <ThemedText type="smallBold">항목 {todos.length}개</ThemedText>
               </ThemedView>
               <ThemedView style={[styles.statusBadge, { backgroundColor: statusBadgeStyle.backgroundColor }]}>
                 <ThemedText type="smallBold" style={{ color: statusBadgeStyle.color }}>
@@ -342,11 +342,11 @@ export default function HomeScreen() {
           </ThemedView>
 
           <ThemedView style={styles.listSection}>
-            <ThemedText type="subtitle">TODO 목록</ThemedText>
+            <ThemedText type="subtitle">목록</ThemedText>
             {todos.length === 0 ? (
               <ThemedView type="backgroundElement" style={styles.todoCard}>
                 <ThemedText type="small" themeColor="textSecondary">
-                  표시할 TODO가 없습니다.
+                  표시할 항목이 없습니다.
                 </ThemedText>
               </ThemedView>
             ) : (
