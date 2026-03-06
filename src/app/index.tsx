@@ -359,7 +359,7 @@ export default function HomeScreen() {
                 <ThemedText
                   type="smallBold"
                   style={hideCompleted ? styles.filterChipTextActive : styles.filterChipTextInactive}>
-                  {hideCompleted ? '완료됨 숨김 켜짐' : '완료됨 숨김 꺼짐'}
+                  {hideCompleted ? '완료된 항목 보이기' : '완료된 항목 숨기기'}
                 </ThemedText>
               </Pressable>
             </View>
