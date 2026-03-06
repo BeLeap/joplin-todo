@@ -23,6 +23,7 @@ import { useOneDriveAuth } from '@/features/sync/use-onedrive-auth';
 import { createWidgetBridge } from '@/features/widget/widget-bridge-factory';
 import { publishTodosToWidget } from '@/features/widget/widget-bridge';
 import { getWidgetSnapshotState } from '@/features/widget/widget-state';
+import { requestJoplinHomeWidgetUpdate } from '@/features/widget/android-home-widget';
 import { useTheme } from '@/hooks/use-theme';
 import { AsyncStorageTodoCache } from '@/storage/todo-cache';
 
@@ -89,6 +90,20 @@ export default function HomeScreen() {
   const [syncStatusDetail, setSyncStatusDetail] = useState<string | null>(null);
   const [hideCompleted, setHideCompleted] = useState<boolean>(false);
 
+  const refreshAndroidHomeWidget = useCallback(
+    async (reason: string) => {
+      try {
+        await requestJoplinHomeWidgetUpdate();
+      } catch (error) {
+        const detail = error instanceof Error ? error.message : String(error);
+        console.error(`[widget-update-failed:${reason}]`, error);
+        setStatus('error');
+        setErrorMessage(`홈 위젯 업데이트 실패(${reason}): ${detail}`);
+      }
+    },
+    [setErrorMessage, setStatus],
+  );
+
   const visibleTodos = useMemo(() => {
     if (!hideCompleted) {
       return todos;
@@ -104,7 +119,8 @@ export default function HomeScreen() {
     await publishTodosToWidget(widgetBridge, snapshot.todos, snapshot.lastSyncedAt, {
       state: getWidgetSnapshotState(snapshot.todos.length, 'ready'),
     });
-  }, []);
+    await refreshAndroidHomeWidget('load-cached-todos');
+  }, [refreshAndroidHomeWidget]);
 
   const refreshTodos = useCallback(async () => {
     const envToken = process.env.EXPO_PUBLIC_ONEDRIVE_ACCESS_TOKEN?.trim() || null;
@@ -129,6 +145,7 @@ export default function HomeScreen() {
     await publishTodosToWidget(widgetBridge, cachedSnapshot.todos, cachedSnapshot.lastSyncedAt, {
       state: getWidgetSnapshotState(cachedSnapshot.todos.length, 'syncing'),
     });
+    await refreshAndroidHomeWidget('pre-sync-cache');
 
     try {
       setSyncStatusDetail('OneDrive 연결 중...');
@@ -165,6 +182,7 @@ export default function HomeScreen() {
         state: getWidgetSnapshotState(result.todos.length, result.fromCache ? 'error' : 'ready'),
         errorMessage: friendlyError,
       });
+      await refreshAndroidHomeWidget('sync-result');
       setStatus(result.fromCache ? 'error' : 'success');
       setErrorMessage(friendlyError);
       setSyncProgress(null);
@@ -177,12 +195,13 @@ export default function HomeScreen() {
         state: 'error',
         errorMessage: friendlyError,
       });
+      await refreshAndroidHomeWidget('sync-fallback-error');
       setStatus('error');
       setErrorMessage(friendlyError);
       setSyncProgress(null);
       setSyncStatusDetail('오류로 인해 서버 동기화를 중단하고 캐시 데이터를 복원함');
     }
-  }, [getValidAccessToken, loadCachedTodos]);
+  }, [getValidAccessToken, loadCachedTodos, refreshAndroidHomeWidget]);
 
   useEffect(() => {
     const initialize = async () => {
@@ -271,7 +290,6 @@ export default function HomeScreen() {
   }, [status, theme.backgroundElement, theme.textSecondary]);
 
   const hasSignedInSession = hasSession || process.env.EXPO_PUBLIC_ONEDRIVE_ACCESS_TOKEN?.trim();
-
   return (
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea}>

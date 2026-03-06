@@ -46,6 +46,21 @@
             "imageWidth": 76
           }
         }
+      ],
+      [
+        "react-native-android-widget",
+        {
+          "widgets": [
+            {
+              "name": "JoplinTodo",
+              "label": "Joplin TODO",
+              "description": "Joplin TODO 목록 위젯",
+              "minWidth": "250dp",
+              "minHeight": "120dp",
+              "updatePeriodMillis": 1800000
+            }
+          ]
+        }
       ]
     ],
     "experiments": {
