@@ -28,22 +28,22 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Compute HeadVer version
+      - name: Compute TAG_NAME version
         run: |
-          HEADVER_VERSION=$(node -e "const appConfig = require('./app.config.js'); process.stdout.write(appConfig({ config: {} }).version);")
+          TAG_NAME=$(node -e "const appJson = require('./app.json'); const { execSync } = require('node:child_process'); const matched = /^(\d+)\./.exec(appJson.expo.version); if (!matched) { throw new Error(`HeadVer 계산 실패: app.json expo.version("${appJson.expo.version}")에서 head(major)를 읽을 수 없습니다.`); } const utcDate = new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), new Date().getUTCDate())); const day = utcDate.getUTCDay() || 7; utcDate.setUTCDate(utcDate.getUTCDate() + 4 - day); const isoYear = utcDate.getUTCFullYear(); const yearStart = new Date(Date.UTC(isoYear, 0, 1)); const week = Math.ceil(((utcDate - yearStart) / 86400000 + 1) / 7); const yearWeek = `${String(isoYear).slice(-2)}${String(week).padStart(2, '0')}`; const envBuild = process.env.EAS_BUILD_NUMBER || process.env.BUILD_NUMBER; const build = envBuild || execSync('git rev-list --count HEAD', { stdio: ['ignore', 'pipe', 'pipe'] }).toString().trim(); if (!/^\d+$/.test(build)) { throw new Error(`HeadVer 계산 실패: 빌드 번호가 숫자가 아닙니다("${build}").`); } process.stdout.write(`${matched[1]}.${yearWeek}.${build}`);")
 
-          if [ -z "$HEADVER_VERSION" ]; then
-            echo "::error::HEADVER_VERSION 계산 결과가 비어 있습니다."
+          if [ -z "$TAG_NAME" ]; then
+            echo "::error::TAG_NAME 계산 결과가 비어 있습니다."
             exit 1
           fi
 
-          echo "HEADVER_VERSION=$HEADVER_VERSION" >> "$GITHUB_ENV"
+          echo "TAG_NAME=$TAG_NAME" >> "$GITHUB_ENV"
 
-          echo "Resolved HEADVER_VERSION=$HEADVER_VERSION"
+          echo "Resolved TAG_NAME=$TAG_NAME"
 
       - name: Generate Android project (Expo prebuild)
         run: |
-          echo "Using HEADVER_VERSION=$HEADVER_VERSION"
+          echo "Using TAG_NAME=$TAG_NAME"
           npx expo prebuild --platform android --non-interactive --no-install
 
       - name: Setup Java
@@ -59,7 +59,7 @@ jobs:
 
       - name: Build release APK via Gradle
         run: |
-          echo "Using HEADVER_VERSION=$HEADVER_VERSION"
+          echo "Using TAG_NAME=$TAG_NAME"
           cd android
           ./gradlew :app:assembleRelease
 
@@ -75,17 +75,17 @@ jobs:
 
       - name: Create and push version tag
         run: |
-          if [ -z "$HEADVER_VERSION" ]; then
-            echo "::error::HEADVER_VERSION 환경변수가 비어 있습니다."
+          if [ -z "$TAG_NAME" ]; then
+            echo "::error::TAG_NAME 환경변수가 비어 있습니다."
             exit 1
           fi
 
-          if git ls-remote --tags origin "refs/tags/$HEADVER_VERSION" | grep -q "$HEADVER_VERSION"; then
-            echo "::error::Tag already exists on origin: $HEADVER_VERSION"
+          if git ls-remote --tags origin "refs/tags/$TAG_NAME" | grep -q "$TAG_NAME"; then
+            echo "::error::Tag already exists on origin: $TAG_NAME"
             exit 1
           fi
 
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git tag -a "$HEADVER_VERSION" -m "Automated version tag for $GITHUB_SHA"
-          git push origin "$HEADVER_VERSION"
+          git tag -a "$TAG_NAME" -m "Automated version tag for $GITHUB_SHA"
+          git push origin "$TAG_NAME"

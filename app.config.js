@@ -28,16 +28,16 @@ module.exports = ({ config }) => {
 };
 
 function resolveHeadverVersion(baseVersion) {
-  const predefinedHeadverVersion = process.env.HEADVER_VERSION;
+  const predefinedTagVersion = process.env.TAG_NAME;
 
-  if (predefinedHeadverVersion) {
-    if (!/^\d+\.\d+\.\d+$/.test(predefinedHeadverVersion)) {
+  if (predefinedTagVersion) {
+    if (!/^\d+\.\d+\.\d+$/.test(predefinedTagVersion)) {
       throw new Error(
-        `HeadVer 계산 실패: HEADVER_VERSION 값 형식이 잘못되었습니다("${predefinedHeadverVersion}").`,
+        `HeadVer 계산 실패: TAG_NAME 값 형식이 잘못되었습니다("${predefinedTagVersion}").`,
       );
     }
 
-    return predefinedHeadverVersion;
+    return predefinedTagVersion;
   }
 
   const head = parseHead(baseVersion);
