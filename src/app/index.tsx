@@ -113,9 +113,10 @@ export default function HomeScreen() {
     setSyncStatusDetail('동기화 준비 중 (인증 토큰 확인 완료)');
     setErrorMessage(null);
     setSyncProgress(null);
-    setTodos([]);
 
     const cachedSnapshot = await cache.loadTodos();
+    setTodos(cachedSnapshot.todos);
+    setLastSyncedAt(cachedSnapshot.lastSyncedAt);
     await publishTodosToWidget(widgetBridge, cachedSnapshot.todos, cachedSnapshot.lastSyncedAt, {
       state: getWidgetSnapshotState(cachedSnapshot.todos.length, 'syncing'),
     });
