@@ -28,6 +28,18 @@ module.exports = ({ config }) => {
 };
 
 function resolveHeadverVersion(baseVersion) {
+  const predefinedHeadverVersion = process.env.HEADVER_VERSION;
+
+  if (predefinedHeadverVersion) {
+    if (!/^\d+\.\d+\.\d+$/.test(predefinedHeadverVersion)) {
+      throw new Error(
+        `HeadVer 계산 실패: HEADVER_VERSION 값 형식이 잘못되었습니다("${predefinedHeadverVersion}").`,
+      );
+    }
+
+    return predefinedHeadverVersion;
+  }
+
   const head = parseHead(baseVersion);
   const yearWeek = getIsoYearWeek(new Date());
   const build = resolveBuildNumber();
