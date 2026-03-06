@@ -290,12 +290,6 @@ export default function HomeScreen() {
   }, [status, theme.backgroundElement, theme.textSecondary]);
 
   const hasSignedInSession = hasSession || process.env.EXPO_PUBLIC_ONEDRIVE_ACCESS_TOKEN?.trim();
-  const widgetPreviewState = getWidgetSnapshotState(
-    visibleTodos.length,
-    status === 'idle' || status === 'success' ? 'ready' : status,
-  );
-  const widgetPreviewTodos = visibleTodos.slice(0, 3);
-
   return (
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
@@ -375,58 +369,6 @@ export default function HomeScreen() {
           </ThemedView>
 
           <ThemedView style={styles.listSection}>
-            <ThemedView type="backgroundElement" style={styles.widgetPreviewCard}>
-              <View style={styles.widgetPreviewHeader}>
-                <ThemedText type="defaultSemiBold">홈 위젯 미리보기</ThemedText>
-                <ThemedView
-                  style={[
-                    styles.widgetStateBadge,
-                    widgetPreviewState === 'ready'
-                      ? styles.widgetStateReady
-                      : widgetPreviewState === 'syncing'
-                        ? styles.widgetStateSyncing
-                        : widgetPreviewState === 'error'
-                          ? styles.widgetStateError
-                          : styles.widgetStateEmpty,
-                  ]}>
-                  <ThemedText type="smallBold" style={styles.widgetStateText}>
-                    {widgetPreviewState.toUpperCase()}
-                  </ThemedText>
-                </ThemedView>
-              </View>
-              <ThemedText type="small" themeColor="textSecondary">
-                마지막 동기화: {formatSyncedAtLabel(lastSyncedAt)}
-              </ThemedText>
-
-              {widgetPreviewState === 'error' ? (
-                <ThemedView style={styles.widgetPreviewErrorBanner}>
-                  <ThemedText type="smallBold" style={styles.errorText}>
-                    위젯 오류
-                  </ThemedText>
-                  <ThemedText type="small" style={styles.errorText}>
-                    {errorMessage ?? '원인을 알 수 없는 오류가 발생했습니다.'}
-                  </ThemedText>
-                </ThemedView>
-              ) : null}
-
-              {widgetPreviewTodos.length === 0 ? (
-                <ThemedText type="small" themeColor="textSecondary">
-                  표시할 할 일이 없습니다.
-                </ThemedText>
-              ) : (
-                widgetPreviewTodos.map((todo) => (
-                  <View key={`widget-preview-${todo.id}`} style={styles.widgetPreviewTodoRow}>
-                    <ThemedText type="smallBold" style={styles.widgetPreviewTodoTitle} numberOfLines={1}>
-                      {todo.title}
-                    </ThemedText>
-                    <ThemedText type="small" themeColor="textSecondary">
-                      {formatDueLabel(todo.due)}
-                    </ThemedText>
-                  </View>
-                ))
-              )}
-            </ThemedView>
-
             <View style={styles.listHeaderRow}>
               <ThemedText type="subtitle">목록</ThemedText>
               <Pressable
@@ -562,52 +504,6 @@ const styles = StyleSheet.create({
   },
   listSection: {
     gap: Spacing.two,
-  },
-  widgetPreviewCard: {
-    borderRadius: Spacing.four,
-    padding: Spacing.three,
-    gap: Spacing.two,
-  },
-  widgetPreviewHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    gap: Spacing.two,
-  },
-  widgetStateBadge: {
-    borderRadius: 999,
-    paddingHorizontal: Spacing.two,
-    paddingVertical: Spacing.one,
-  },
-  widgetStateReady: {
-    backgroundColor: '#E7F8EE',
-  },
-  widgetStateSyncing: {
-    backgroundColor: '#E8F0FF',
-  },
-  widgetStateError: {
-    backgroundColor: '#FDECEC',
-  },
-  widgetStateEmpty: {
-    backgroundColor: '#E5E7EB',
-  },
-  widgetStateText: {
-    color: '#1F2937',
-  },
-  widgetPreviewErrorBanner: {
-    backgroundColor: '#FDECEC',
-    borderRadius: Spacing.two,
-    padding: Spacing.two,
-    gap: Spacing.one,
-  },
-  widgetPreviewTodoRow: {
-    gap: 2,
-    paddingVertical: Spacing.one,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#D1D5DB',
-  },
-  widgetPreviewTodoTitle: {
-    color: '#0F172A',
   },
   listHeaderRow: {
     flexDirection: 'row',
