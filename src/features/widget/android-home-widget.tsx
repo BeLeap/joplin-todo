@@ -57,6 +57,14 @@ const loadSnapshot = async (): Promise<WidgetSnapshot | null> => {
   return parseWidgetSnapshot(serialized);
 };
 
+const hasMatchingWidgetName = (incomingName: string) => {
+  if (incomingName === WIDGET_NAME) {
+    return true;
+  }
+
+  return incomingName.toLowerCase() === WIDGET_NAME.toLowerCase();
+};
+
 const WidgetRoot = ({ snapshot, explicitError }: { snapshot: WidgetSnapshot | null; explicitError?: string }) => {
   const todos = snapshot?.todos.slice(0, 4) ?? [];
   const state = snapshot?.state ?? 'empty';
@@ -112,6 +120,16 @@ const WidgetRoot = ({ snapshot, explicitError }: { snapshot: WidgetSnapshot | nu
 const renderCurrentWidget = async () => {
   try {
     const snapshot = await loadSnapshot();
+
+    if (!snapshot) {
+      return (
+        <WidgetRoot
+          snapshot={null}
+          explicitError="스냅샷이 없습니다. 앱을 한 번 열어 동기화를 실행해 주세요."
+        />
+      );
+    }
+
     return <WidgetRoot snapshot={snapshot} />;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -127,7 +145,13 @@ export const registerJoplinHomeWidgetTask = () => {
   }
 
   registerWidgetTaskHandler(async (props: WidgetTaskHandlerProps) => {
-    if (props.widgetInfo.widgetName !== WIDGET_NAME) {
+    if (!hasMatchingWidgetName(props.widgetInfo.widgetName)) {
+      props.renderWidget(
+        <WidgetRoot
+          snapshot={null}
+          explicitError={`위젯 이름 불일치: expected=${WIDGET_NAME}, actual=${props.widgetInfo.widgetName}`}
+        />,
+      );
       return;
     }
 
