@@ -68,7 +68,6 @@ const WidgetRoot = ({ snapshot, explicitError }: { snapshot: WidgetSnapshot | nu
         height: 'match_parent',
         width: 'match_parent',
         backgroundColor: '#FFFFFF',
-        borderRadius: 16,
         padding: 14,
         flexDirection: 'column',
         justifyContent: 'flex-start',
@@ -81,7 +80,7 @@ const WidgetRoot = ({ snapshot, explicitError }: { snapshot: WidgetSnapshot | nu
           alignItems: 'center',
           marginBottom: 6,
         }}>
-        <TextWidget text="Joplin TODO" style={{ fontSize: 14, fontWeight: '700' }} />
+        <TextWidget text="Joplin TODO" style={{ fontSize: 14, color: '#0F172A' }} />
         <TextWidget text={getStateLabel(state)} style={{ fontSize: 12, color: '#334155' }} />
       </FlexWidget>
 
@@ -97,9 +96,9 @@ const WidgetRoot = ({ snapshot, explicitError }: { snapshot: WidgetSnapshot | nu
       {todos.length === 0 ? (
         <TextWidget text="표시할 항목이 없습니다." style={{ color: '#64748B', fontSize: 12 }} />
       ) : (
-        <FlexWidget style={{ flexDirection: 'column', flexGap: 4 }}>
+        <FlexWidget style={{ flexDirection: 'column' }}>
           {todos.map((todo) => (
-            <FlexWidget key={todo.id} style={{ flexDirection: 'column' }}>
+            <FlexWidget key={todo.id} style={{ flexDirection: 'column', marginBottom: 4 }}>
               <TextWidget text={`• ${todo.title}`} style={{ fontSize: 13 }} />
               <TextWidget text={formatDueLabel(todo.due)} style={{ fontSize: 11, color: '#64748B' }} />
             </FlexWidget>
