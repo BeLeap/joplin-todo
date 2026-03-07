@@ -1,4 +1,3 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import React from 'react';
 import { Platform } from 'react-native';
 import {
@@ -10,10 +9,10 @@ import {
 } from 'react-native-android-widget';
 
 import type { WidgetSnapshot } from './types';
-import { parseWidgetSnapshot } from './widget-snapshot';
+import { createWidgetBridge } from './widget-bridge-factory';
 
 const WIDGET_NAME = 'JoplinTodo';
-const SNAPSHOT_KEY = 'widget:snapshot';
+const widgetBridge = createWidgetBridge();
 
 const formatSyncedAtLabel = (syncedAt: string | null): string => {
   if (!syncedAt) {
@@ -49,12 +48,7 @@ const getStateLabel = (state: WidgetSnapshot['state']): string => {
 };
 
 const loadSnapshot = async (): Promise<WidgetSnapshot | null> => {
-  const serialized = await AsyncStorage.getItem(SNAPSHOT_KEY);
-  if (!serialized) {
-    return null;
-  }
-
-  return parseWidgetSnapshot(serialized);
+  return widgetBridge.loadSnapshot();
 };
 
 const hasMatchingWidgetName = (incomingName: string) => {
