@@ -64,3 +64,10 @@ npx eas build --platform ios
 - 앱 동기화가 끝날 때마다 위젯 업데이트를 요청합니다.
 - `app.json`의 plugin 설정에 위젯 정의가 포함되어 있으므로, 네이티브 반영을 위해 Android 개발 빌드는 `npx expo run:android`(또는 EAS Build)로 다시 빌드해야 합니다.
 
+
+## 에이전트 작업 기록 규칙
+
+- 작업을 완료할 때마다, 이후 작업 시 참고할 수 있도록 작업 내용을 문서로 남깁니다.
+- 문서 경로 규칙: `docs/<date>/<appropriate-title>.md`
+  - `<date>`는 `YYYY-MM-DD` 형식을 사용합니다.
+  - `<appropriate-title>`는 작업 내용을 설명하는 소문자 kebab-case를 사용합니다.
