@@ -29,7 +29,6 @@ class FlakySource implements OneDriveJoplinSource {
         title: 'retry success',
         type_: 1,
         is_todo: 1,
-        todo_due: 0,
         todo_completed: 0,
         updated_time: Date.now(),
         encryption_applied: 0,
@@ -61,7 +60,6 @@ class IncrementalSource implements OneDriveJoplinSource {
           title: 'Existing todo',
           type_: 1,
           is_todo: 1,
-          todo_due: 0,
           todo_completed: 0,
           updated_time: Date.now(),
           encryption_applied: 0,
@@ -75,7 +73,6 @@ class IncrementalSource implements OneDriveJoplinSource {
         title: 'New todo',
         type_: 1,
         is_todo: 1,
-        todo_due: 0,
         todo_completed: 0,
         updated_time: Date.now(),
         encryption_applied: 0,
@@ -115,7 +112,6 @@ class TwoItemSource implements OneDriveJoplinSource {
         title: 'checkpoint 1',
         type_: 1,
         is_todo: 1,
-        todo_due: 0,
         todo_completed: 0,
         updated_time: Date.now(),
         encryption_applied: 0,
@@ -125,7 +121,6 @@ class TwoItemSource implements OneDriveJoplinSource {
         title: 'checkpoint 2',
         type_: 1,
         is_todo: 1,
-        todo_due: 0,
         todo_completed: 0,
         updated_time: Date.now(),
         encryption_applied: 0,
@@ -164,7 +159,6 @@ class ResumableSource implements OneDriveJoplinSource {
         title: 'Resume 1',
         type_: 1,
         is_todo: 1,
-        todo_due: 0,
         todo_completed: 0,
         updated_time: Date.now(),
         encryption_applied: 0,
@@ -181,7 +175,6 @@ class ResumableSource implements OneDriveJoplinSource {
         title: 'Resume 2',
         type_: 1,
         is_todo: 1,
-        todo_due: 0,
         todo_completed: 0,
         updated_time: Date.now(),
         encryption_applied: 0,
@@ -209,7 +202,6 @@ const run = async () => {
           id: 'enc-1',
           title: 'Encrypted todo',
           type_: 13,
-          todo_due: 0,
           todo_completed: 0,
           updated_time: Date.now(),
           encryption_applied: 1,
@@ -225,7 +217,6 @@ const run = async () => {
       title: ' ',
       type_: 1,
       is_todo: 1,
-      todo_due: Number.NaN,
       todo_completed: 1,
       updated_time: Number.NaN,
       encryption_applied: 0,
@@ -237,7 +228,6 @@ const run = async () => {
       title: 'Legacy todo flag item',
       type_: 1,
       is_todo: 1,
-      todo_due: 0,
       todo_completed: 0,
       updated_time: Date.now(),
       encryption_applied: 0,
@@ -245,7 +235,6 @@ const run = async () => {
   ]);
   assert.equal(parsedFromTodoFlag.length, 1, 'is_todo 플래그가 있으면 todo로 처리해야 합니다.');
   assert.equal(parsed[0]?.title, '(제목 없음)', '빈 제목은 기본 텍스트를 사용해야 합니다.');
-  assert.equal(parsed[0]?.due, null, '비정상 due 값은 null 처리해야 합니다.');
 
 
 
@@ -253,7 +242,6 @@ const run = async () => {
 id: meta-1
 parent_id: root
 is_todo: 1
-todo_due: not-a-number
 todo_completed: 0
 updated_time: 1700000000000
 encryption_applied: 0
@@ -262,7 +250,6 @@ Body`);
   assert.ok(parsedFromMetadata, '메타데이터 파싱 결과가 있어야 합니다.');
   assert.equal(parsedFromMetadata?.id, 'meta-1');
   assert.equal(parsedFromMetadata?.title, 'Hello, World!', '첫 줄을 제목으로 파싱해야 합니다.');
-  assert.equal(parsedFromMetadata?.todo_due, 0, '잘못된 숫자 필드는 0으로 보정해야 합니다.');
   assert.equal(
     parsedFromMetadata?.updated_time,
     1700000000000,
@@ -273,7 +260,6 @@ Body`);
 title: Metadata todo via flag
 type_: 1
 is_todo: 1
-todo_due: 0
 todo_completed: 0
 updated_time: 1700000000000
 encryption_applied: 0
@@ -292,7 +278,6 @@ Body line 2
 id: body-meta-1
 type_: 1
 is_todo: 1
-todo_due: 0
 todo_completed: 0
 updated_time: 2026-03-04T05:18:43.454Z
 encryption_applied: 0`);
@@ -399,7 +384,6 @@ encryption_applied: 0`);
 id: todo-graph
 type_: 1
 is_todo: 1
-todo_due: 0
 todo_completed: 0
 updated_time: 1700000000000
 encryption_applied: 0
@@ -454,7 +438,6 @@ Body`,
 id: todo-incremental
 type_: 1
 is_todo: 1
-todo_due: 0
 todo_completed: 0
 updated_time: 1700000000000
 encryption_applied: 0
