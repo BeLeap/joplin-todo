@@ -27,18 +27,6 @@ const formatSyncedAtLabel = (syncedAt: string | null): string => {
   });
 };
 
-const formatDueLabel = (due: string | null): string => {
-  if (!due) {
-    return '마감일 없음';
-  }
-
-  return new Date(due).toLocaleString('ko-KR', {
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-};
 
 const getStateLabel = (state: WidgetSnapshot['state']): string => {
   if (state === 'ready') return '정상';
@@ -102,7 +90,6 @@ const WidgetRoot = ({ snapshot, explicitError }: { snapshot: WidgetSnapshot | nu
           {todos.map((todo) => (
             <FlexWidget key={todo.id} style={{ flexDirection: 'column', marginBottom: 4 }}>
               <TextWidget text={`• ${todo.title}`} style={{ fontSize: 13 }} />
-              <TextWidget text={formatDueLabel(todo.due)} style={{ fontSize: 11, color: '#64748B' }} />
             </FlexWidget>
           ))}
         </FlexWidget>

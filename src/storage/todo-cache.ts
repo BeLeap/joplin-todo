@@ -27,12 +27,9 @@ const isTodoItem = (value: unknown): value is TodoItem => {
 
   const candidate = value as Partial<TodoItem>;
 
-  const hasDue = candidate.due === null || typeof candidate.due === 'string';
-
   return (
     typeof candidate.id === 'string' &&
     typeof candidate.title === 'string' &&
-    hasDue &&
     typeof candidate.completed === 'boolean' &&
     typeof candidate.updatedTime === 'string'
   );

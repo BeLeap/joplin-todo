@@ -1,4 +1,4 @@
-import { sortTodosByDueDate } from '@/features/todo/sort';
+import { sortTodos } from '@/features/todo/sort';
 import type { TodoItem } from '@/features/todo/types';
 import type { TodoCache } from '@/storage/todo-cache';
 
@@ -74,7 +74,7 @@ export const syncTodosFromOneDrive = async (
               return Array.from(byId.values());
             })()
           : fetchedTodos;
-      const sortedTodos = sortTodosByDueDate(mergedTodos);
+      const sortedTodos = sortTodos(mergedTodos);
       const syncedAt = new Date().toISOString();
 
       await cache.saveTodos(sortedTodos, syncedAt);

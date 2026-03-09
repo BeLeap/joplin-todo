@@ -17,7 +17,7 @@ import {
   type OneDriveSyncProgress,
 } from '@/features/sync/onedrive-source';
 import { syncTodosFromOneDriveWithCacheFallback } from '@/features/sync/sync-todos';
-import { sortTodosByDueDate } from '@/features/todo/sort';
+import { sortTodos } from '@/features/todo/sort';
 import type { TodoItem } from '@/features/todo/types';
 import { useOneDriveAuth } from '@/features/sync/use-onedrive-auth';
 import { createWidgetBridge } from '@/features/widget/widget-bridge-factory';
@@ -33,18 +33,6 @@ const widgetBridge = createWidgetBridge();
 
 type SyncStatus = 'idle' | 'syncing' | 'success' | 'error';
 
-const formatDueLabel = (due: string | null) => {
-  if (!due) {
-    return '마감일 없음';
-  }
-
-  return new Date(due).toLocaleString('ko-KR', {
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-};
 
 const formatSyncedAtLabel = (syncedAt: string | null) => {
   if (!syncedAt) {
@@ -168,7 +156,7 @@ export default function HomeScreen() {
         },
         onTodoParsed: (todo) => {
           setTodos((previousTodos) =>
-            sortTodosByDueDate([
+            sortTodos([
               ...previousTodos.filter((previousTodo) => previousTodo.id !== todo.id),
               todo,
             ]),
@@ -393,9 +381,6 @@ export default function HomeScreen() {
               visibleTodos.map((todo) => (
                 <ThemedView key={todo.id} type="backgroundElement" style={styles.todoCard}>
                   <ThemedText type="defaultSemiBold">{todo.title}</ThemedText>
-                  <ThemedText type="small" themeColor="textSecondary">
-                    {formatDueLabel(todo.due)}
-                  </ThemedText>
                   <ThemedView
                     style={[
                       styles.todoStatus,

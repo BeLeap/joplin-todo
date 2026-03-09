@@ -1,7 +1,6 @@
 export type WidgetTodoItem = {
   id: string;
   title: string;
-  due: string | null;
   completed: boolean;
 };
 

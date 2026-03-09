@@ -5,7 +5,6 @@ export type JoplinRawTodo = {
   title: string;
   type_: number;
   is_todo?: number;
-  todo_due: number;
   todo_completed: number;
   updated_time: number;
   encryption_applied: number;

@@ -14,7 +14,6 @@ export const createWidgetSnapshot = (
   const limitedTodos = todos.slice(0, maxItems).map((todo) => ({
     id: todo.id,
     title: todo.title,
-    due: todo.due,
     completed: todo.completed,
   }));
 
@@ -40,7 +39,6 @@ export const parseWidgetSnapshot = (value: string): WidgetSnapshot => {
       (todo) =>
         typeof todo?.id !== 'string' ||
         typeof todo?.title !== 'string' ||
-        (todo?.due !== null && typeof todo?.due !== 'string') ||
         typeof todo?.completed !== 'boolean',
     );
 
