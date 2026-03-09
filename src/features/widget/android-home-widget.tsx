@@ -39,7 +39,11 @@ const loadSnapshot = async (): Promise<WidgetSnapshot | null> => {
   return widgetBridge.loadSnapshot();
 };
 
-const hasMatchingWidgetName = (incomingName: string) => {
+const hasMatchingWidgetName = (incomingName: string | undefined) => {
+  if (!incomingName) {
+    return false;
+  }
+
   if (incomingName === WIDGET_NAME) {
     return true;
   }
@@ -126,11 +130,13 @@ export const registerJoplinHomeWidgetTask = () => {
   }
 
   registerWidgetTaskHandler(async (props: WidgetTaskHandlerProps) => {
-    if (!hasMatchingWidgetName(props.widgetInfo.widgetName)) {
+    const incomingWidgetName = props.widgetInfo?.widgetName;
+
+    if (!hasMatchingWidgetName(incomingWidgetName)) {
       props.renderWidget(
         <WidgetRoot
           snapshot={null}
-          explicitError={`위젯 이름 불일치: expected=${WIDGET_NAME}, actual=${props.widgetInfo.widgetName}`}
+          explicitError={`위젯 이름 불일치: expected=${WIDGET_NAME}, actual=${String(incomingWidgetName)}`}
         />,
       );
       return;
