@@ -171,13 +171,3 @@ src/
   storage/              # AsyncStorage 기반 캐시
   components/           # 공용 UI 컴포넌트
 ```
-
----
-
-## 작업 기록 규칙 (에이전트/개발 협업)
-
-작업 완료 시 아래 규칙으로 문서를 남깁니다.
-
-- 경로: `docs/<date>/<appropriate-title>.md`
-- `<date>`: `YYYY-MM-DD`
-- `<appropriate-title>`: 작업 내용을 설명하는 소문자 kebab-case
