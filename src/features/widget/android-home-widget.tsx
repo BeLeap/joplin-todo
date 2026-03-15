@@ -11,11 +11,18 @@ import {
   type WidgetTaskHandlerProps,
 } from 'react-native-android-widget';
 
+import { OneDriveAuthError } from '@/features/sync/errors';
+import { GraphOneDriveJoplinSource } from '@/features/sync/onedrive-source';
+import { getValidStoredAccessToken } from '@/features/sync/onedrive-auth-session';
+import { AsyncStorageTodoCache } from '@/storage/todo-cache';
+
 import type { WidgetSnapshot } from './types';
 import { createWidgetBridge } from './widget-bridge-factory';
+import { runWidgetRefreshIfDue } from './widget-refresh-runner';
 
 const WIDGET_NAME = 'JoplinTodo';
 const widgetBridge = createWidgetBridge();
+const cache = new AsyncStorageTodoCache();
 
 const formatSyncedAtLabel = (syncedAt: string | null): string => {
   if (!syncedAt) {
@@ -29,7 +36,6 @@ const formatSyncedAtLabel = (syncedAt: string | null): string => {
     minute: '2-digit',
   });
 };
-
 
 const getStateLabel = (state: WidgetSnapshot['state']): string => {
   if (state === 'ready') return '정상';
@@ -52,6 +58,23 @@ const hasMatchingWidgetName = (incomingName: string | undefined) => {
   }
 
   return incomingName.toLowerCase() === WIDGET_NAME.toLowerCase();
+};
+
+const syncWidgetDataIfDue = async () => {
+  const envToken = process.env.EXPO_PUBLIC_ONEDRIVE_ACCESS_TOKEN?.trim() || null;
+  const sessionToken = await getValidStoredAccessToken(process.env.EXPO_PUBLIC_ONEDRIVE_CLIENT_ID);
+  const token = sessionToken ?? envToken;
+
+  if (!token) {
+    throw new OneDriveAuthError('백그라운드 동기화에 필요한 OneDrive 세션이 없습니다. 앱에서 로그인해 주세요.');
+  }
+
+  const source = new GraphOneDriveJoplinSource(token);
+  const refreshResult = await runWidgetRefreshIfDue(source, cache, widgetBridge);
+
+  if (refreshResult.status === 'failed') {
+    throw new Error('백그라운드 위젯 동기화가 실패했습니다.');
+  }
 };
 
 const WidgetRoot = ({ snapshot, explicitError }: { snapshot: WidgetSnapshot | null; explicitError?: string }) => {
@@ -155,6 +178,12 @@ export const registerJoplinHomeWidgetTask = () => {
       return;
     }
 
+    try {
+      await syncWidgetDataIfDue();
+    } catch (error) {
+      console.error('[widget-background-sync-failed]', error);
+    }
+
     props.renderWidget(await renderCurrentWidget());
   });
 
@@ -168,6 +197,14 @@ export const requestJoplinHomeWidgetUpdate = async () => {
 
   await requestWidgetUpdate({
     widgetName: WIDGET_NAME,
-    renderWidget: async () => renderCurrentWidget(),
+    renderWidget: async () => {
+      try {
+        await syncWidgetDataIfDue();
+      } catch (error) {
+        console.error('[widget-update-sync-failed]', error);
+      }
+
+      return renderCurrentWidget();
+    },
   });
 };
