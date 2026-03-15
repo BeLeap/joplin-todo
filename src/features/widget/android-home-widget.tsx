@@ -54,7 +54,7 @@ const hasMatchingWidgetName = (incomingName: string | undefined) => {
 };
 
 const WidgetRoot = ({ snapshot, explicitError }: { snapshot: WidgetSnapshot | null; explicitError?: string }) => {
-  const todos = snapshot?.todos.slice(0, 4) ?? [];
+  const todos = snapshot?.todos.filter((todo) => !todo.completed) ?? [];
   const state = snapshot?.state ?? 'empty';
   const errorText = explicitError ?? snapshot?.errorMessage ?? null;
 
@@ -90,7 +90,7 @@ const WidgetRoot = ({ snapshot, explicitError }: { snapshot: WidgetSnapshot | nu
       ) : null}
 
       {todos.length === 0 ? (
-        <TextWidget text="표시할 항목이 없습니다." style={{ color: '#64748B', fontSize: 12 }} />
+        <TextWidget text="표시할 미완료 항목이 없습니다." style={{ color: '#64748B', fontSize: 12 }} />
       ) : (
         <FlexWidget style={{ flexDirection: 'column' }}>
           {todos.map((todo) => (
