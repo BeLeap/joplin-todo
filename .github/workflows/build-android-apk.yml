@@ -105,7 +105,7 @@ jobs:
       # setup-java(cache: gradle)보다 setup-gradle이 Gradle User Home/빌드 캐시 재사용 제어가 세밀하고,
       # 빌드 스캔/의존성 캐시 등 Gradle 실행 맥락 최적화에 유리해 반복 APK 빌드에서 효율이 더 좋다.
       - name: Setup Gradle cache
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@v5
 
       - name: Grant execute permission for Gradle wrapper
         run: chmod +x android/gradlew
