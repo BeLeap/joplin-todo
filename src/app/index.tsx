@@ -277,20 +277,22 @@ export default function HomeScreen() {
               Joplin Widget
             </ThemedText>
             <ThemedText style={styles.title}>오늘 할 일</ThemedText>
-            <View style={styles.kpiRow}>
-              <ThemedView type="background" style={styles.kpiChip}>
-                <ThemedText type="smallBold">항목 {visibleTodos.length}개</ThemedText>
-              </ThemedView>
-              <ThemedView style={[styles.statusBadge, { backgroundColor: statusBadgeStyle.backgroundColor }]}>
-                <ThemedText type="smallBold" style={{ color: statusBadgeStyle.color }}>
-                  {statusHeadline}
-                </ThemedText>
-              </ThemedView>
-            </View>
           </View>
 
           <ThemedView type="backgroundElement" style={styles.statusCard}>
-            <ThemedText type="defaultSemiBold">동기화 상태</ThemedText>
+            <View style={styles.statusCardHeaderRow}>
+              <ThemedText type="defaultSemiBold">동기화 상태</ThemedText>
+              <View style={styles.kpiRow}>
+                <ThemedView type="background" style={styles.kpiChip}>
+                  <ThemedText type="smallBold">항목 {visibleTodos.length}개</ThemedText>
+                </ThemedView>
+                <ThemedView style={[styles.statusBadge, { backgroundColor: statusBadgeStyle.backgroundColor }]}>
+                  <ThemedText type="smallBold" style={{ color: statusBadgeStyle.color }}>
+                    {statusHeadline}
+                  </ThemedText>
+                </ThemedView>
+              </View>
+            </View>
             <View style={styles.statusMessageBlock}>
               <ThemedText type="defaultSemiBold">{statusHeadline}</ThemedText>
               {statusDetail ? (
@@ -436,6 +438,12 @@ const styles = StyleSheet.create({
   statusCard: {
     padding: Spacing.three,
     borderRadius: Spacing.four,
+    gap: Spacing.two,
+  },
+  statusCardHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
     gap: Spacing.two,
   },
   statusMessageBlock: {
