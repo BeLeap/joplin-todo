@@ -54,7 +54,7 @@ export const syncTodosFromOneDrive = async (
           await options.onTodoParsed?.(todoItem);
         }
       }, {
-        modifiedSince: snapshot.lastSyncedAt,
+        modifiedSince: null,
         resumeFromCompleted,
       });
       const parsedTodos = Array.from(parsedTodoById.values());
@@ -64,17 +64,7 @@ export const syncTodosFromOneDrive = async (
         fetchedById.set(todo.id, todo);
       });
       const fetchedTodos = Array.from(fetchedById.values());
-      const mergedTodos =
-        source.incrementalMode === 'modifiedSince' && snapshot.lastSyncedAt
-          ? (() => {
-              const byId = new Map(snapshot.todos.map((todo) => [todo.id, todo]));
-              fetchedTodos.forEach((todo) => {
-                byId.set(todo.id, todo);
-              });
-              return Array.from(byId.values());
-            })()
-          : fetchedTodos;
-      const sortedTodos = sortTodos(mergedTodos);
+      const sortedTodos = sortTodos(fetchedTodos);
       const syncedAt = new Date().toISOString();
 
       await cache.saveTodos(sortedTodos, syncedAt);

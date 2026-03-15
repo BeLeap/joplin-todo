@@ -208,7 +208,6 @@ const toGraphError = async (response: Response, context: GraphRequestContext) =>
 };
 
 export interface OneDriveJoplinSource {
-  readonly incrementalMode?: 'modifiedSince';
   listJoplinItems(
     onProgress?: (progress: OneDriveSyncProgress) => void | Promise<void>,
     onItem?: (item: JoplinRawTodo) => void | Promise<void>,
@@ -227,8 +226,6 @@ export type OneDriveSyncProgress = {
 };
 
 export class GraphOneDriveJoplinSource implements OneDriveJoplinSource {
-  readonly incrementalMode = 'modifiedSince' as const;
-
   constructor(
     private readonly accessToken: string,
     private readonly retryOptions: {
