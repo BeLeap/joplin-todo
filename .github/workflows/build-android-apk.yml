@@ -122,7 +122,7 @@ jobs:
         run: cp android/app/build/outputs/apk/release/app-release.apk app-release.apk
 
       - name: Upload APK artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: app-release-apk-${{ env.TAG_NAME }}
           path: app-release.apk
