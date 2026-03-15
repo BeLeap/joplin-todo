@@ -4,6 +4,7 @@ import React from 'react';
 import { Platform } from 'react-native';
 import {
   FlexWidget,
+  ListWidget,
   TextWidget,
   registerWidgetTaskHandler,
   requestWidgetUpdate,
@@ -92,13 +93,23 @@ const WidgetRoot = ({ snapshot, explicitError }: { snapshot: WidgetSnapshot | nu
       {todos.length === 0 ? (
         <TextWidget text="표시할 미완료 항목이 없습니다." style={{ color: '#64748B', fontSize: 12 }} />
       ) : (
-        <FlexWidget style={{ flexDirection: 'column' }}>
+        <ListWidget
+          style={{
+            width: 'match_parent',
+            height: 'match_parent',
+          }}>
           {todos.map((todo) => (
-            <FlexWidget key={todo.id} style={{ flexDirection: 'column', marginBottom: 4 }}>
+            <FlexWidget
+              key={todo.id}
+              style={{
+                flexDirection: 'column',
+                marginBottom: 4,
+                paddingVertical: 2,
+              }}>
               <TextWidget text={`• ${todo.title}`} style={{ fontSize: 13 }} />
             </FlexWidget>
           ))}
-        </FlexWidget>
+        </ListWidget>
       )}
     </FlexWidget>
   );

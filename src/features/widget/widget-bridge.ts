@@ -36,6 +36,7 @@ type KeyValueStorage = {
 
 const SNAPSHOT_KEY = 'widget:snapshot';
 const REFRESH_AT_KEY = 'widget:refresh-at';
+const MAX_WIDGET_SNAPSHOT_ITEMS = 100;
 
 export class NativeWidgetBridge implements WidgetBridge {
   constructor(private readonly module: WidgetNativeModule) {}
@@ -174,7 +175,7 @@ export const publishTodosToWidget = async (
   const snapshot = createWidgetSnapshot(
     todos,
     lastSyncedAt,
-    20,
+    MAX_WIDGET_SNAPSHOT_ITEMS,
     options?.state ?? (todos.length > 0 ? 'ready' : 'empty'),
     options?.errorMessage ?? null,
   );

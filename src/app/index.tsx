@@ -369,30 +369,36 @@ export default function HomeScreen() {
                 </ThemedText>
               </Pressable>
             </View>
-            {visibleTodos.length === 0 ? (
-              <ThemedView type="backgroundElement" style={styles.todoCard}>
-                <ThemedText type="small" themeColor="textSecondary">
-                  {hideCompleted
-                    ? '완료되지 않은 항목이 없습니다. (완료됨 숨김 옵션이 켜져 있습니다.)'
-                    : '표시할 항목이 없습니다.'}
-                </ThemedText>
-              </ThemedView>
-            ) : (
-              visibleTodos.map((todo) => (
-                <ThemedView key={todo.id} type="backgroundElement" style={styles.todoCard}>
-                  <ThemedText type="defaultSemiBold">{todo.title}</ThemedText>
-                  <ThemedView
-                    style={[
-                      styles.todoStatus,
-                      { backgroundColor: todo.completed ? '#E7F8EE' : Colors.light.backgroundSelected },
-                    ]}>
-                    <ThemedText type="smallBold" style={{ color: todo.completed ? '#0C7A42' : '#244A8F' }}>
-                      {todo.completed ? '완료됨' : '진행중'}
-                    </ThemedText>
-                  </ThemedView>
+            <ScrollView
+              style={styles.todoListScrollArea}
+              contentContainerStyle={styles.todoListContent}
+              nestedScrollEnabled
+              showsVerticalScrollIndicator>
+              {visibleTodos.length === 0 ? (
+                <ThemedView type="backgroundElement" style={styles.todoCard}>
+                  <ThemedText type="small" themeColor="textSecondary">
+                    {hideCompleted
+                      ? '완료되지 않은 항목이 없습니다. (완료됨 숨김 옵션이 켜져 있습니다.)'
+                      : '표시할 항목이 없습니다.'}
+                  </ThemedText>
                 </ThemedView>
-              ))
-            )}
+              ) : (
+                visibleTodos.map((todo) => (
+                  <ThemedView key={todo.id} type="backgroundElement" style={styles.todoCard}>
+                    <ThemedText type="defaultSemiBold">{todo.title}</ThemedText>
+                    <ThemedView
+                      style={[
+                        styles.todoStatus,
+                        { backgroundColor: todo.completed ? '#E7F8EE' : Colors.light.backgroundSelected },
+                      ]}>
+                      <ThemedText type="smallBold" style={{ color: todo.completed ? '#0C7A42' : '#244A8F' }}>
+                        {todo.completed ? '완료됨' : '진행중'}
+                      </ThemedText>
+                    </ThemedView>
+                  </ThemedView>
+                ))
+              )}
+            </ScrollView>
           </ThemedView>
         </ScrollView>
       </SafeAreaView>
@@ -489,6 +495,14 @@ const styles = StyleSheet.create({
   },
   listSection: {
     gap: Spacing.two,
+    flex: 1,
+  },
+  todoListScrollArea: {
+    maxHeight: 380,
+  },
+  todoListContent: {
+    gap: Spacing.two,
+    paddingBottom: Spacing.one,
   },
   listHeaderRow: {
     flexDirection: 'row',
