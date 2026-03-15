@@ -1,8 +1,6 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   exchangeCodeAsync,
   makeRedirectUri,
-  refreshAsync,
   ResponseType,
   revokeAsync,
   useAuthRequest,
@@ -11,61 +9,19 @@ import * as WebBrowser from 'expo-web-browser';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { OneDriveAuthError } from './errors';
+import {
+  clearStoredToken,
+  getValidStoredAccessToken,
+  ONEDRIVE_DISCOVERY,
+  readStoredToken,
+  toExpiresAt,
+  type StoredAuthToken,
+  writeStoredToken,
+} from './onedrive-auth-session';
 
 WebBrowser.maybeCompleteAuthSession();
 
-const ONEDRIVE_DISCOVERY = {
-  authorizationEndpoint: 'https://login.microsoftonline.com/common/oauth2/v2.0/authorize',
-  tokenEndpoint: 'https://login.microsoftonline.com/common/oauth2/v2.0/token',
-  revocationEndpoint: 'https://login.microsoftonline.com/common/oauth2/v2.0/logout',
-};
-
 const ONEDRIVE_SCOPES = ['openid', 'profile', 'offline_access', 'Files.Read'];
-const ONEDRIVE_AUTH_STORAGE_KEY = '@joplinTodo/onedriveAuth';
-
-type StoredAuthToken = {
-  accessToken: string;
-  refreshToken: string | null;
-  expiresAt: number | null;
-};
-
-const readStoredToken = async (): Promise<StoredAuthToken | null> => {
-  const raw = await AsyncStorage.getItem(ONEDRIVE_AUTH_STORAGE_KEY);
-  if (!raw) {
-    return null;
-  }
-
-  try {
-    const parsed = JSON.parse(raw) as StoredAuthToken;
-    if (!parsed.accessToken || typeof parsed.accessToken !== 'string') {
-      return null;
-    }
-
-    return {
-      accessToken: parsed.accessToken,
-      refreshToken: parsed.refreshToken ?? null,
-      expiresAt: parsed.expiresAt ?? null,
-    };
-  } catch {
-    return null;
-  }
-};
-
-const writeStoredToken = async (token: StoredAuthToken) => {
-  await AsyncStorage.setItem(ONEDRIVE_AUTH_STORAGE_KEY, JSON.stringify(token));
-};
-
-const clearStoredToken = async () => {
-  await AsyncStorage.removeItem(ONEDRIVE_AUTH_STORAGE_KEY);
-};
-
-const toExpiresAt = (expiresIn: number | undefined) => {
-  if (!expiresIn || expiresIn <= 0) {
-    return null;
-  }
-
-  return Date.now() + expiresIn * 1000;
-};
 
 export const useOneDriveAuth = () => {
   const clientId = process.env.EXPO_PUBLIC_ONEDRIVE_CLIENT_ID;
@@ -127,36 +83,16 @@ export const useOneDriveAuth = () => {
   );
 
   const getValidAccessToken = useCallback(async (): Promise<string | null> => {
-    if (!authToken) {
+    const token = await getValidStoredAccessToken(clientId);
+    if (!token) {
+      setAuthToken(null);
       return null;
     }
 
-    if (!authToken.expiresAt || authToken.expiresAt - 60_000 > Date.now()) {
-      return authToken.accessToken;
-    }
-
-    if (!authToken.refreshToken || !clientId) {
-      return authToken.accessToken;
-    }
-
-    const refreshed = await refreshAsync(
-      {
-        clientId,
-        refreshToken: authToken.refreshToken,
-      },
-      ONEDRIVE_DISCOVERY,
-    );
-
-    const nextToken: StoredAuthToken = {
-      accessToken: refreshed.accessToken,
-      refreshToken: refreshed.refreshToken ?? authToken.refreshToken,
-      expiresAt: toExpiresAt(refreshed.expiresIn),
-    };
-
-    await writeStoredToken(nextToken);
-    setAuthToken(nextToken);
-    return nextToken.accessToken;
-  }, [authToken, clientId]);
+    const stored = await readStoredToken();
+    setAuthToken(stored);
+    return token;
+  }, [clientId]);
 
   const signIn = useCallback(async () => {
     if (!clientId) {
@@ -197,9 +133,7 @@ export const useOneDriveAuth = () => {
           token: authToken.accessToken,
         },
         ONEDRIVE_DISCOVERY,
-      ).catch(() => {
-        // ignore revoke failures
-      });
+      );
     }
 
     await clearStoredToken();

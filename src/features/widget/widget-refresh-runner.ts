@@ -60,7 +60,8 @@ export const runWidgetRefreshIfDue = async (
       status: result.fromCache ? 'cache-fallback' : 'synced',
       refreshAt: published.refreshAt,
     };
-  } catch {
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error);
     const fallbackSnapshot = await cache.loadTodos();
     const published = await publishTodosToWidget(
       bridge,
@@ -68,7 +69,7 @@ export const runWidgetRefreshIfDue = async (
       fallbackSnapshot.lastSyncedAt,
       {
         state: 'error',
-        errorMessage: '동기화에 실패했습니다. 마지막 캐시를 표시합니다.',
+        errorMessage: `동기화에 실패했습니다: ${detail}. 마지막 캐시를 표시합니다.`,
       },
     );
 
