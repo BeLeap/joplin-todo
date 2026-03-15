@@ -33,7 +33,6 @@ const widgetBridge = createWidgetBridge();
 
 type SyncStatus = 'idle' | 'syncing' | 'success' | 'error';
 
-
 const formatSyncedAtLabel = (syncedAt: string | null) => {
   if (!syncedAt) {
     return '동기화 기록 없음';
@@ -123,7 +122,7 @@ export default function HomeScreen() {
     }
 
     setStatus('syncing');
-    setSyncStatusDetail('동기화 준비 중 (인증 토큰 확인 완료)');
+    setSyncStatusDetail('준비 중');
     setErrorMessage(null);
     setSyncProgress(null);
 
@@ -136,23 +135,16 @@ export default function HomeScreen() {
     await refreshAndroidHomeWidget('pre-sync-cache');
 
     try {
-      setSyncStatusDetail('OneDrive 연결 중...');
+      setSyncStatusDetail('연결 중');
       const source = createSyncSource(token);
       const result = await syncTodosFromOneDriveWithCacheFallback(source, cache, {
         maxRetries: 2,
         retryDelayMs: 500,
         onProgress: (progress) => {
           setSyncStatusDetail(
-            progress.phase === 'listing'
-              ? 'Joplin 원본 파일 목록 확인 중...'
-              : '파일을 내려받아 TODO를 파싱 중...',
+            progress.phase === 'listing' ? '목록 확인 중' : '파일 처리 중',
           );
-          setSyncProgress((previousProgress) => ({
-            ...progress,
-            currentFileName:
-              progress.currentFileName ??
-              (progress.phase === 'downloading' ? previousProgress?.currentFileName ?? null : null),
-          }));
+          setSyncProgress(progress);
         },
         onTodoParsed: (todo) => {
           setTodos((previousTodos) =>
@@ -174,7 +166,7 @@ export default function HomeScreen() {
       setStatus(result.fromCache ? 'error' : 'success');
       setErrorMessage(friendlyError);
       setSyncProgress(null);
-      setSyncStatusDetail(result.fromCache ? '네트워크 오류로 캐시 결과를 표시 중' : null);
+      setSyncStatusDetail(result.fromCache ? '캐시 표시 중' : null);
     } catch (error) {
       const friendlyError = toUserFriendlyError(error);
       await loadCachedTodos();
@@ -187,7 +179,7 @@ export default function HomeScreen() {
       setStatus('error');
       setErrorMessage(friendlyError);
       setSyncProgress(null);
-      setSyncStatusDetail('오류로 인해 서버 동기화를 중단하고 캐시 데이터를 복원함');
+      setSyncStatusDetail('캐시로 복구됨');
     }
   }, [getValidAccessToken, loadCachedTodos, refreshAndroidHomeWidget]);
 
@@ -224,31 +216,29 @@ export default function HomeScreen() {
 
   const statusHeadline = useMemo(() => {
     switch (status) {
-      case 'syncing': {
-        return '동기화 중...';
-      }
+      case 'syncing':
+        return '동기화 중';
       case 'success':
-        return 'OneDrive 동기화 성공';
+        return '동기화 완료';
       case 'error':
-        return '오프라인/오류 상태 (캐시 표시)';
+        return '오류 · 캐시 표시';
       default:
-        return '대기 중';
+        return '대기';
     }
   }, [status]);
 
   const statusDetail = useMemo(() => {
     if (status === 'syncing') {
       if (!syncProgress) {
-        return syncStatusDetail ?? '초기화 단계 진행 중...';
+        return syncStatusDetail ?? '진행 중';
       }
 
-      const { phase, completed, total, currentFileName } = syncProgress;
+      const { phase, completed, total } = syncProgress;
       if (phase === 'listing') {
-        return '파일 목록을 확인하는 중';
+        return '목록 확인 중';
       }
 
-      const progressLabel = `진행률 ${Math.min(completed, total)}/${total}`;
-      return currentFileName ? `${progressLabel} · ${currentFileName}` : progressLabel;
+      return `${Math.min(completed, total)}/${total} 파일 처리`;
     }
 
     if (status === 'error') {
@@ -282,28 +272,25 @@ export default function HomeScreen() {
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
         <ScrollView contentContainerStyle={styles.scrollContent}>
-          <ThemedView type="backgroundElement" style={styles.headerCard}>
+          <View style={styles.headerSection}>
             <ThemedText type="smallBold" themeColor="textSecondary">
               Joplin Widget
             </ThemedText>
-            <ThemedText style={styles.title}>오늘 할 일을 한눈에</ThemedText>
-            <ThemedText type="small" themeColor="textSecondary">
-              OneDrive에 저장된 Joplin 항목을 동기화해 위젯과 앱에서 확인하세요.
-            </ThemedText>
+            <ThemedText style={styles.title}>오늘 할 일</ThemedText>
             <View style={styles.kpiRow}>
               <ThemedView type="background" style={styles.kpiChip}>
                 <ThemedText type="smallBold">항목 {visibleTodos.length}개</ThemedText>
               </ThemedView>
               <ThemedView style={[styles.statusBadge, { backgroundColor: statusBadgeStyle.backgroundColor }]}>
                 <ThemedText type="smallBold" style={{ color: statusBadgeStyle.color }}>
-                  {status.toUpperCase()}
+                  {statusHeadline}
                 </ThemedText>
               </ThemedView>
             </View>
-          </ThemedView>
+          </View>
 
           <ThemedView type="backgroundElement" style={styles.statusCard}>
-            <ThemedText type="defaultSemiBold">연결 상태</ThemedText>
+            <ThemedText type="defaultSemiBold">동기화 상태</ThemedText>
             <View style={styles.statusMessageBlock}>
               <ThemedText type="defaultSemiBold">{statusHeadline}</ThemedText>
               {statusDetail ? (
@@ -422,21 +409,19 @@ const styles = StyleSheet.create({
     gap: Spacing.three,
     paddingVertical: Spacing.four,
   },
-  headerCard: {
-    borderRadius: Spacing.four,
-    gap: Spacing.two,
-    padding: Spacing.three,
+  headerSection: {
+    gap: Spacing.one,
+    paddingVertical: Spacing.one,
   },
   title: {
-    fontSize: 28,
-    lineHeight: 36,
+    fontSize: 24,
+    lineHeight: 30,
     fontWeight: 700,
   },
   kpiRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.two,
-    marginTop: Spacing.one,
   },
   kpiChip: {
     borderRadius: 999,
