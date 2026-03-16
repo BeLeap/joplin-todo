@@ -214,6 +214,7 @@ export interface OneDriveJoplinSource {
     options?: {
       modifiedSince?: string | null;
       resumeFromCompleted?: number;
+      onFilesListed?: (fileNames: string[]) => void | Promise<void>;
     },
   ): Promise<JoplinRawTodo[]>;
 }
@@ -339,9 +340,14 @@ export class GraphOneDriveJoplinSource implements OneDriveJoplinSource {
   async listJoplinItems(
     onProgress?: (progress: OneDriveSyncProgress) => void | Promise<void>,
     onItem?: (item: JoplinRawTodo) => void | Promise<void>,
-    options: { modifiedSince?: string | null; resumeFromCompleted?: number } = {},
+    options: {
+      modifiedSince?: string | null;
+      resumeFromCompleted?: number;
+      onFilesListed?: (fileNames: string[]) => void | Promise<void>;
+    } = {},
   ): Promise<JoplinRawTodo[]> {
     const files = await this.listJoplinFiles(options.modifiedSince);
+    await options.onFilesListed?.(files.map((file) => file.name));
     const completedBeforeStart = Math.max(0, options.resumeFromCompleted ?? 0);
     const filesToDownload = files.slice(completedBeforeStart);
     await onProgress?.({

@@ -16,6 +16,15 @@ type SyncOptions = {
 
 const sleep = async (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
+const toTodoIdFromFileName = (fileName: string) => {
+  if (!fileName.endsWith('.md')) {
+    return null;
+  }
+
+  const todoId = fileName.slice(0, -3).trim();
+  return todoId ? todoId : null;
+};
+
 export const syncTodosFromOneDrive = async (
   source: OneDriveJoplinSource,
   cache: TodoCache,
@@ -28,6 +37,7 @@ export const syncTodosFromOneDrive = async (
   const canResume = checkpoint?.modifiedSince === snapshot.lastSyncedAt;
   const parsedTodoById = new Map((canResume ? checkpoint?.parsedTodos : []).map((todo) => [todo.id, todo]));
   let resumeFromCompleted = canResume ? checkpoint?.completed ?? 0 : 0;
+  let listedTodoIds: Set<string> | null = null;
 
   let lastError: unknown;
   for (let attempt = 0; attempt <= maxRetries; attempt += 1) {
@@ -56,11 +66,27 @@ export const syncTodosFromOneDrive = async (
       }, {
         modifiedSince: null,
         resumeFromCompleted,
+        onFilesListed: async (fileNames) => {
+          listedTodoIds = new Set(fileNames.map(toTodoIdFromFileName).filter((todoId): todoId is string => !!todoId));
+          for (const todoId of Array.from(parsedTodoById.keys())) {
+            if (!listedTodoIds.has(todoId)) {
+              parsedTodoById.delete(todoId);
+            }
+          }
+          await cache.saveSyncCheckpoint({
+            modifiedSince: snapshot.lastSyncedAt,
+            completed: Math.min(resumeFromCompleted, listedTodoIds.size),
+            parsedTodos: Array.from(parsedTodoById.values()),
+          });
+        },
       });
       const parsedTodos = Array.from(parsedTodoById.values());
       const normalizedTodos = normalizeJoplinTodos(rawItems);
       const fetchedById = new Map(normalizedTodos.map((todo) => [todo.id, todo]));
       parsedTodos.forEach((todo) => {
+        if (listedTodoIds && !listedTodoIds.has(todo.id)) {
+          return;
+        }
         fetchedById.set(todo.id, todo);
       });
       const fetchedTodos = Array.from(fetchedById.values());
