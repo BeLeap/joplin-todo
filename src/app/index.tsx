@@ -1,5 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import {
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  View,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
@@ -76,6 +83,7 @@ export default function HomeScreen() {
   const [syncProgress, setSyncProgress] = useState<OneDriveSyncProgress | null>(null);
   const [syncStatusDetail, setSyncStatusDetail] = useState<string | null>(null);
   const [hideCompleted, setHideCompleted] = useState<boolean>(false);
+  const [isStatusCardCollapsed, setIsStatusCardCollapsed] = useState<boolean>(false);
 
   const refreshAndroidHomeWidget = useCallback(
     async (reason: string) => {
@@ -267,82 +275,119 @@ export default function HomeScreen() {
     };
   }, [status, theme.backgroundElement, theme.textSecondary]);
 
+  const compactStatusLabel = useMemo(() => {
+    if (status === 'syncing') {
+      if (!syncProgress || syncProgress.phase === 'listing' || syncProgress.total <= 0) {
+        return '동기화 0%';
+      }
+
+      const percentage = Math.round((Math.min(syncProgress.completed, syncProgress.total) / syncProgress.total) * 100);
+      return `동기화 ${percentage}%`;
+    }
+
+    if (status === 'success') {
+      return '동기화 완료';
+    }
+
+    if (status === 'error') {
+      return '동기화 오류';
+    }
+
+    return '동기화 대기';
+  }, [status, syncProgress]);
+
+  const handleTodoListScroll = useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const shouldCollapse = event.nativeEvent.contentOffset.y > 20;
+    setIsStatusCardCollapsed((previous) => (previous === shouldCollapse ? previous : shouldCollapse));
+  }, []);
+
   const hasSignedInSession = hasSession || process.env.EXPO_PUBLIC_ONEDRIVE_ACCESS_TOKEN?.trim();
   return (
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
-        <ScrollView style={styles.screenScroll} contentContainerStyle={styles.scrollContent}>
+        <View style={styles.screenContent}>
           <View style={styles.headerSection}>
             <ThemedText type="smallBold" themeColor="textSecondary">
               Joplin Widget
             </ThemedText>
-            <ThemedText style={styles.title}>오늘 할 일</ThemedText>
-          </View>
-
-          <ThemedView type="backgroundElement" style={styles.statusCard}>
-            <View style={styles.statusCardHeaderRow}>
-              <ThemedText type="defaultSemiBold">동기화 상태</ThemedText>
-              <View style={styles.kpiRow}>
-                <ThemedView type="background" style={styles.kpiChip}>
-                  <ThemedText type="smallBold">항목 {visibleTodos.length}개</ThemedText>
-                </ThemedView>
-                <ThemedView style={[styles.statusBadge, { backgroundColor: statusBadgeStyle.backgroundColor }]}>
-                  <ThemedText type="smallBold" style={{ color: statusBadgeStyle.color }}>
-                    {statusHeadline}
+            <View style={styles.titleRow}>
+              <ThemedText style={styles.title}>오늘 할 일</ThemedText>
+              {isStatusCardCollapsed ? (
+                <ThemedView style={styles.compactStatusBadge}>
+                  <ThemedText type="smallBold" style={styles.compactStatusText}>
+                    {compactStatusLabel}
                   </ThemedText>
                 </ThemedView>
-              </View>
-            </View>
-            <View style={styles.statusMessageBlock}>
-              {statusDetail ? (
-                <ThemedText
-                  type="small"
-                  style={[styles.statusDetailText, status === 'error' ? styles.statusErrorDetailText : null]}>
-                  {statusDetail}
-                </ThemedText>
               ) : null}
             </View>
-            <ThemedText type="small" themeColor="textSecondary">
-              마지막 동기화: {formatSyncedAtLabel(lastSyncedAt)}
-            </ThemedText>
+          </View>
 
-            <View style={styles.actionRow}>
-              {hasSignedInSession ? (
-                <>
-                  <Pressable style={[styles.actionButton, styles.actionButtonPrimary]} onPress={() => void refreshTodos()}>
+          {isStatusCardCollapsed ? null : (
+            <ThemedView type="backgroundElement" style={styles.statusCard}>
+              <View style={styles.statusCardHeaderRow}>
+                <ThemedText type="defaultSemiBold">동기화 상태</ThemedText>
+                <View style={styles.kpiRow}>
+                  <ThemedView type="background" style={styles.kpiChip}>
+                    <ThemedText type="smallBold">항목 {visibleTodos.length}개</ThemedText>
+                  </ThemedView>
+                  <ThemedView style={[styles.statusBadge, { backgroundColor: statusBadgeStyle.backgroundColor }]}>
+                    <ThemedText type="smallBold" style={{ color: statusBadgeStyle.color }}>
+                      {statusHeadline}
+                    </ThemedText>
+                  </ThemedView>
+                </View>
+              </View>
+              <View style={styles.statusMessageBlock}>
+                {statusDetail ? (
+                  <ThemedText
+                    type="small"
+                    style={[styles.statusDetailText, status === 'error' ? styles.statusErrorDetailText : null]}>
+                    {statusDetail}
+                  </ThemedText>
+                ) : null}
+              </View>
+              <ThemedText type="small" themeColor="textSecondary">
+                마지막 동기화: {formatSyncedAtLabel(lastSyncedAt)}
+              </ThemedText>
+
+              <View style={styles.actionRow}>
+                {hasSignedInSession ? (
+                  <>
+                    <Pressable style={[styles.actionButton, styles.actionButtonPrimary]} onPress={() => void refreshTodos()}>
+                      <ThemedText type="smallBold" style={styles.primaryButtonText}>
+                        수동 새로고침
+                      </ThemedText>
+                    </Pressable>
+                    {hasSession ? (
+                      <Pressable style={[styles.actionButton, styles.actionButtonSecondary]} onPress={() => void handleSignOut()}>
+                        <ThemedText type="smallBold">로그아웃</ThemedText>
+                      </Pressable>
+                    ) : null}
+                  </>
+                ) : (
+                  <Pressable
+                    style={[styles.actionButton, styles.actionButtonPrimary]}
+                    onPress={() => void handleSignIn()}
+                    disabled={!hasClientId || isAuthLoading}>
                     <ThemedText type="smallBold" style={styles.primaryButtonText}>
-                      수동 새로고침
+                      {hasClientId ? 'OneDrive 로그인' : 'Client ID 설정 필요'}
                     </ThemedText>
                   </Pressable>
-                  {hasSession ? (
-                    <Pressable style={[styles.actionButton, styles.actionButtonSecondary]} onPress={() => void handleSignOut()}>
-                      <ThemedText type="smallBold">로그아웃</ThemedText>
-                    </Pressable>
-                  ) : null}
-                </>
-              ) : (
-                <Pressable
-                  style={[styles.actionButton, styles.actionButtonPrimary]}
-                  onPress={() => void handleSignIn()}
-                  disabled={!hasClientId || isAuthLoading}>
-                  <ThemedText type="smallBold" style={styles.primaryButtonText}>
-                    {hasClientId ? 'OneDrive 로그인' : 'Client ID 설정 필요'}
-                  </ThemedText>
-                </Pressable>
-              )}
-            </View>
+                )}
+              </View>
 
-            {errorMessage ? (
-              <ThemedView style={styles.errorBanner}>
-                <ThemedText type="smallBold" style={styles.errorText}>
-                  오류 발생
-                </ThemedText>
-                <ThemedText type="small" style={styles.errorText}>
-                  {errorMessage}
-                </ThemedText>
-              </ThemedView>
-            ) : null}
-          </ThemedView>
+              {errorMessage ? (
+                <ThemedView style={styles.errorBanner}>
+                  <ThemedText type="smallBold" style={styles.errorText}>
+                    오류 발생
+                  </ThemedText>
+                  <ThemedText type="small" style={styles.errorText}>
+                    {errorMessage}
+                  </ThemedText>
+                </ThemedView>
+              ) : null}
+            </ThemedView>
+          )}
 
           <ThemedView style={styles.listSection}>
             <View style={styles.listHeaderRow}>
@@ -361,6 +406,8 @@ export default function HomeScreen() {
               style={styles.todoListScrollArea}
               contentContainerStyle={styles.todoListContent}
               nestedScrollEnabled
+              onScroll={handleTodoListScroll}
+              scrollEventThrottle={16}
               showsVerticalScrollIndicator>
               {visibleTodos.length === 0 ? (
                 <ThemedView type="backgroundElement" style={styles.todoCard}>
@@ -388,7 +435,7 @@ export default function HomeScreen() {
               )}
             </ScrollView>
           </ThemedView>
-        </ScrollView>
+        </View>
       </SafeAreaView>
     </ThemedView>
   );
@@ -406,11 +453,8 @@ const styles = StyleSheet.create({
     paddingBottom: Spacing.four,
     maxWidth: MaxContentWidth,
   },
-  screenScroll: {
+  screenContent: {
     flex: 1,
-  },
-  scrollContent: {
-    flexGrow: 1,
     gap: Spacing.three,
     paddingVertical: Spacing.four,
   },
@@ -423,6 +467,23 @@ const styles = StyleSheet.create({
     lineHeight: 36,
     fontWeight: 700,
     letterSpacing: 0.2,
+  },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: Spacing.two,
+  },
+  compactStatusBadge: {
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: '#111111',
+    paddingHorizontal: Spacing.two,
+    paddingVertical: 6,
+    backgroundColor: '#111111',
+  },
+  compactStatusText: {
+    color: '#FFFFFF',
   },
   kpiRow: {
     flexDirection: 'row',
