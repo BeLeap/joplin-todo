@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Pressable,
   ScrollView,
@@ -298,16 +298,29 @@ export default function HomeScreen() {
 
   const COLLAPSE_SCROLL_Y = 20;
   const EXPAND_SCROLL_Y = 0;
+  const COLLAPSE_TRANSITION_LOCK_MS = 180;
+  const lastScrollYRef = useRef(0);
+  const collapseTransitionLockUntilRef = useRef(0);
 
   const handleTodoListScroll = useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const now = Date.now();
     const y = event.nativeEvent.contentOffset.y;
+    const previousY = lastScrollYRef.current;
+    const isScrollingUp = y < previousY;
+    lastScrollYRef.current = y;
 
     setIsStatusCardCollapsed((previous) => {
+      if (now < collapseTransitionLockUntilRef.current) {
+        return previous;
+      }
+
       if (!previous && y > COLLAPSE_SCROLL_Y) {
+        collapseTransitionLockUntilRef.current = now + COLLAPSE_TRANSITION_LOCK_MS;
         return true;
       }
 
-      if (previous && y <= EXPAND_SCROLL_Y) {
+      if (previous && y <= EXPAND_SCROLL_Y && isScrollingUp) {
+        collapseTransitionLockUntilRef.current = now + COLLAPSE_TRANSITION_LOCK_MS;
         return false;
       }
 
