@@ -296,9 +296,23 @@ export default function HomeScreen() {
     return '동기화 대기';
   }, [status, syncProgress]);
 
+  const COLLAPSE_SCROLL_Y = 20;
+  const EXPAND_SCROLL_Y = 0;
+
   const handleTodoListScroll = useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const shouldCollapse = event.nativeEvent.contentOffset.y > 20;
-    setIsStatusCardCollapsed((previous) => (previous === shouldCollapse ? previous : shouldCollapse));
+    const y = event.nativeEvent.contentOffset.y;
+
+    setIsStatusCardCollapsed((previous) => {
+      if (!previous && y > COLLAPSE_SCROLL_Y) {
+        return true;
+      }
+
+      if (previous && y <= EXPAND_SCROLL_Y) {
+        return false;
+      }
+
+      return previous;
+    });
   }, []);
 
   const hasSignedInSession = hasSession || process.env.EXPO_PUBLIC_ONEDRIVE_ACCESS_TOKEN?.trim();
