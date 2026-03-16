@@ -294,7 +294,6 @@ export default function HomeScreen() {
               </View>
             </View>
             <View style={styles.statusMessageBlock}>
-              <ThemedText type="defaultSemiBold">{statusHeadline}</ThemedText>
               {statusDetail ? (
                 <ThemedText
                   type="small"
