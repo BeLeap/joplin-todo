@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Colors, MaxContentWidth, Spacing } from '@/constants/theme';
+import { MaxContentWidth, Spacing } from '@/constants/theme';
 import {
   EncryptedJoplinSyncError,
   OneDriveAuthError,
@@ -250,15 +250,15 @@ export default function HomeScreen() {
 
   const statusBadgeStyle = useMemo(() => {
     if (status === 'success') {
-      return { backgroundColor: '#E7F8EE', color: '#0C7A42' };
+      return { backgroundColor: '#111111', color: '#FFFFFF' };
     }
 
     if (status === 'error') {
-      return { backgroundColor: '#FDECEC', color: '#B42424' };
+      return { backgroundColor: '#1F1F1F', color: '#FFFFFF' };
     }
 
     if (status === 'syncing') {
-      return { backgroundColor: '#E8F0FF', color: '#2A5AC8' };
+      return { backgroundColor: '#2A2A2A', color: '#FFFFFF' };
     }
 
     return {
@@ -377,9 +377,9 @@ export default function HomeScreen() {
                     <ThemedView
                       style={[
                         styles.todoStatus,
-                        { backgroundColor: todo.completed ? '#E7F8EE' : Colors.light.backgroundSelected },
+                        { backgroundColor: todo.completed ? '#111111' : '#FFFFFF' },
                       ]}>
-                      <ThemedText type="smallBold" style={{ color: todo.completed ? '#0C7A42' : '#244A8F' }}>
+                      <ThemedText type="smallBold" style={{ color: todo.completed ? '#FFFFFF' : '#111111' }}>
                         {todo.completed ? '완료됨' : '진행중'}
                       </ThemedText>
                     </ThemedView>
@@ -415,9 +415,10 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.one,
   },
   title: {
-    fontSize: 24,
-    lineHeight: 30,
+    fontSize: 30,
+    lineHeight: 36,
     fontWeight: 700,
+    letterSpacing: 0.2,
   },
   kpiRow: {
     flexDirection: 'row',
@@ -425,19 +426,23 @@ const styles = StyleSheet.create({
     gap: Spacing.two,
   },
   kpiChip: {
-    borderRadius: 999,
+    borderRadius: 4,
     paddingHorizontal: Spacing.three,
     paddingVertical: Spacing.one,
+    borderWidth: 1,
+    borderColor: '#111111',
   },
   statusBadge: {
-    borderRadius: 999,
+    borderRadius: 4,
     paddingHorizontal: Spacing.three,
     paddingVertical: Spacing.one,
   },
   statusCard: {
     padding: Spacing.three,
-    borderRadius: Spacing.four,
+    borderRadius: 6,
     gap: Spacing.two,
+    borderWidth: 1,
+    borderColor: '#111111',
   },
   statusCardHeaderRow: {
     flexDirection: 'row',
@@ -449,13 +454,14 @@ const styles = StyleSheet.create({
     gap: Spacing.one,
   },
   statusDetailText: {
-    color: '#2A5AC8',
+    color: '#111111',
     fontSize: 13,
     lineHeight: 18,
   },
   statusErrorDetailText: {
-    color: '#B42424',
-    fontWeight: 600,
+    color: '#111111',
+    fontWeight: 700,
+    textDecorationLine: 'underline',
   },
   actionRow: {
     flexDirection: 'row',
@@ -463,27 +469,31 @@ const styles = StyleSheet.create({
     gap: Spacing.two,
   },
   actionButton: {
-    borderRadius: 999,
+    borderRadius: 4,
     paddingHorizontal: Spacing.three,
     paddingVertical: Spacing.two,
+    borderWidth: 1,
+    borderColor: '#111111',
   },
   actionButtonPrimary: {
-    backgroundColor: '#2A5AC8',
+    backgroundColor: '#111111',
   },
   actionButtonSecondary: {
-    backgroundColor: '#E5E7EB',
+    backgroundColor: '#FFFFFF',
   },
   primaryButtonText: {
-    color: '#F8FAFC',
+    color: '#FFFFFF',
   },
   errorBanner: {
-    backgroundColor: '#FDECEC',
-    borderRadius: Spacing.three,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 4,
     padding: Spacing.two,
     gap: Spacing.one,
+    borderWidth: 1,
+    borderColor: '#111111',
   },
   errorText: {
-    color: '#B42424',
+    color: '#111111',
   },
   listSection: {
     gap: Spacing.two,
@@ -503,30 +513,36 @@ const styles = StyleSheet.create({
     gap: Spacing.two,
   },
   filterChip: {
-    borderRadius: 999,
+    borderRadius: 4,
     paddingHorizontal: Spacing.two,
     paddingVertical: Spacing.one,
-    backgroundColor: '#E5E7EB',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#111111',
   },
   filterChipActive: {
-    backgroundColor: '#2A5AC8',
+    backgroundColor: '#111111',
   },
   filterChipTextInactive: {
-    color: '#334155',
+    color: '#111111',
   },
   filterChipTextActive: {
-    color: '#F8FAFC',
+    color: '#FFFFFF',
   },
   todoCard: {
     padding: Spacing.three,
-    borderRadius: Spacing.four,
+    borderRadius: 6,
     gap: Spacing.one,
+    borderWidth: 1,
+    borderColor: '#111111',
   },
   todoStatus: {
     alignSelf: 'flex-start',
-    borderRadius: 999,
+    borderRadius: 4,
     paddingHorizontal: Spacing.two,
     paddingVertical: Spacing.one,
     marginTop: Spacing.one,
+    borderWidth: 1,
+    borderColor: '#111111',
   },
 });
