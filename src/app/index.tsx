@@ -374,7 +374,9 @@ export default function HomeScreen() {
                     </Pressable>
                     {hasSession ? (
                       <Pressable style={[styles.actionButton, styles.actionButtonSecondary]} onPress={() => void handleSignOut()}>
-                        <ThemedText type="smallBold">로그아웃</ThemedText>
+                        <ThemedText type="smallBold" style={styles.secondaryButtonText}>
+                          로그아웃
+                        </ThemedText>
                       </Pressable>
                     ) : null}
                   </>
@@ -562,6 +564,9 @@ const styles = StyleSheet.create({
   },
   primaryButtonText: {
     color: '#FFFFFF',
+  },
+  secondaryButtonText: {
+    color: '#111111',
   },
   errorBanner: {
     backgroundColor: '#FFFFFF',
