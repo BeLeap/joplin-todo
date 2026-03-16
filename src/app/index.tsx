@@ -271,7 +271,7 @@ export default function HomeScreen() {
   return (
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
-        <ScrollView contentContainerStyle={styles.scrollContent}>
+        <ScrollView style={styles.screenScroll} contentContainerStyle={styles.scrollContent}>
           <View style={styles.headerSection}>
             <ThemedText type="smallBold" themeColor="textSecondary">
               Joplin Widget
@@ -406,7 +406,11 @@ const styles = StyleSheet.create({
     paddingBottom: Spacing.four,
     maxWidth: MaxContentWidth,
   },
+  screenScroll: {
+    flex: 1,
+  },
   scrollContent: {
+    flexGrow: 1,
     gap: Spacing.three,
     paddingVertical: Spacing.four,
   },
@@ -500,7 +504,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   todoListScrollArea: {
-    maxHeight: 380,
+    flex: 1,
   },
   todoListContent: {
     gap: Spacing.two,
