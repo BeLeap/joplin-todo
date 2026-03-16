@@ -86,25 +86,33 @@ Microsoft Entra App 등록 시 아래 값을 사용하세요.
 
 ## 빌드 & 실행 명령어
 
+> 실행/빌드 명령어를 사용할 때는 `TAG_NAME=0.0.0` 환경 변수를 함께 지정하세요.
+>
+> 예시:
+>
+> ```bash
+> TAG_NAME=0.0.0 npm run start
+> ```
+
 ### 기본 스크립트
 
 ```bash
-npm run start
-npm run android
-npm run web
-npm run lint
+TAG_NAME=0.0.0 npm run start
+TAG_NAME=0.0.0 npm run android
+TAG_NAME=0.0.0 npm run web
+TAG_NAME=0.0.0 npm run lint
 ```
 
 ### Android 개발 빌드 (네이티브 반영)
 
 ```bash
-npx expo run:android
+TAG_NAME=0.0.0 npx expo run:android
 ```
 
 ### EAS 빌드 (Android)
 
 ```bash
-npx eas build --platform android
+TAG_NAME=0.0.0 npx eas build --platform android
 ```
 
 ### Justfile 보조 명령어
