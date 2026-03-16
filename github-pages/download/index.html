@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Joplin TODO APK 다운로드</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f7f8fb;
+        --card: #ffffff;
+        --text: #1f2937;
+        --muted: #6b7280;
+        --primary: #2563eb;
+        --primary-pressed: #1d4ed8;
+        --danger: #b91c1c;
+        --border: #e5e7eb;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        color: var(--text);
+        background: var(--bg);
+        display: grid;
+        place-items: center;
+        padding: 20px;
+      }
+      .card {
+        width: min(560px, 100%);
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        padding: 24px;
+        box-shadow: 0 8px 24px rgba(17, 24, 39, 0.08);
+      }
+      h1 { margin: 0 0 8px; font-size: 1.4rem; }
+      p { margin: 0; color: var(--muted); line-height: 1.5; }
+      .status { margin-top: 14px; font-size: 0.95rem; }
+      .status.error { color: var(--danger); }
+      .actions { display: flex; flex-direction: column; gap: 10px; margin-top: 18px; }
+      .button {
+        border: none;
+        border-radius: 12px;
+        padding: 14px 16px;
+        font-weight: 700;
+        text-align: center;
+        text-decoration: none;
+        cursor: pointer;
+      }
+      .button.primary { color: #fff; background: var(--primary); }
+      .button.primary:active { background: var(--primary-pressed); }
+      .button.secondary { color: var(--text); background: #f3f4f6; }
+      .meta {
+        margin-top: 14px;
+        padding-top: 14px;
+        border-top: 1px dashed var(--border);
+        font-size: 0.92rem;
+        color: var(--muted);
+      }
+      .meta code { color: var(--text); }
+    </style>
+  </head>
+  <body>
+    <main class="card">
+      <h1>Joplin TODO Android APK</h1>
+      <p>최근 성공한 APK 빌드의 Actions artifact를 자동으로 찾아 모바일에서 바로 열 수 있게 연결합니다.</p>
+      <p id="status" class="status">최근 성공 빌드 확인 중...</p>
+      <section class="actions">
+        <a id="downloadBtn" class="button primary" href="#" aria-disabled="true">APK artifact 준비 중...</a>
+        <a id="runBtn" class="button secondary" href="#" target="_blank" rel="noreferrer">해당 워크플로 실행 열기</a>
+        <a id="workflowBtn" class="button secondary" href="#" target="_blank" rel="noreferrer">APK 빌드 워크플로 목록</a>
+      </section>
+      <div id="meta" class="meta"></div>
+    </main>
+
+    <script>
+      const statusEl = document.getElementById("status");
+      const downloadBtn = document.getElementById("downloadBtn");
+      const runBtn = document.getElementById("runBtn");
+      const workflowBtn = document.getElementById("workflowBtn");
+      const metaEl = document.getElementById("meta");
+
+      function setError(message) {
+        statusEl.textContent = message;
+        statusEl.classList.add("error");
+        downloadBtn.textContent = "APK artifact를 찾지 못했습니다";
+        downloadBtn.removeAttribute("href");
+        downloadBtn.setAttribute("aria-disabled", "true");
+      }
+
+      function inferRepo() {
+        const host = window.location.hostname;
+        const pathParts = window.location.pathname.split("/").filter(Boolean);
+        const owner = host.endsWith(".github.io") ? host.replace(".github.io", "") : null;
+        const repo = pathParts[0] ?? null;
+
+        if (!owner || !repo) {
+          throw new Error("GitHub Pages URL에서 owner/repo를 추론할 수 없습니다.");
+        }
+
+        return { owner, repo };
+      }
+
+      async function fetchJsonOrThrow(url) {
+        const response = await fetch(url, { headers: { Accept: "application/vnd.github+json" } });
+        if (!response.ok) {
+          throw new Error(`GitHub API 요청 실패: ${url} (status=${response.status}).`);
+        }
+        return response.json();
+      }
+
+      function pickLatestSuccessfulRun(runs) {
+        const successfulRuns = runs.filter((run) => run.status === "completed" && run.conclusion === "success");
+        if (successfulRuns.length === 0) {
+          throw new Error("성공한 APK 빌드 워크플로 실행을 찾지 못했습니다.");
+        }
+        return successfulRuns[0];
+      }
+
+      function pickLatestApkArtifact(artifacts) {
+        const apkArtifacts = artifacts
+          .filter((artifact) => artifact.name.startsWith("app-release-apk-") && !artifact.expired)
+          .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+        if (apkArtifacts.length === 0) {
+          throw new Error("유효한 APK artifact를 찾지 못했습니다. artifact 만료 여부를 확인하세요.");
+        }
+
+        return apkArtifacts[0];
+      }
+
+      async function loadLatestApkArtifact() {
+        const { owner, repo } = inferRepo();
+        const workflowFileName = "build-android-apk.yml";
+        const workflowRunsPageUrl = `https://github.com/${owner}/${repo}/actions/workflows/${workflowFileName}`;
+        workflowBtn.href = workflowRunsPageUrl;
+
+        const runsData = await fetchJsonOrThrow(
+          `https://api.github.com/repos/${owner}/${repo}/actions/workflows/${workflowFileName}/runs?branch=develop&per_page=20`
+        );
+
+        const latestRun = pickLatestSuccessfulRun(runsData.workflow_runs ?? []);
+        const runPageUrl = `https://github.com/${owner}/${repo}/actions/runs/${latestRun.id}`;
+        runBtn.href = runPageUrl;
+
+        const artifactsData = await fetchJsonOrThrow(
+          `https://api.github.com/repos/${owner}/${repo}/actions/runs/${latestRun.id}/artifacts?per_page=100`
+        );
+
+        const latestArtifact = pickLatestApkArtifact(artifactsData.artifacts ?? []);
+        const artifactPageUrl = `https://github.com/${owner}/${repo}/actions/runs/${latestRun.id}/artifacts/${latestArtifact.id}`;
+
+        downloadBtn.href = artifactPageUrl;
+        downloadBtn.textContent = `${latestArtifact.name} 다운로드`;
+        downloadBtn.removeAttribute("aria-disabled");
+
+        statusEl.textContent = "최신 APK artifact를 찾았습니다. 다운로드 버튼을 눌러주세요.";
+        metaEl.innerHTML =
+          `워크플로 실행: <code>#${latestRun.run_number}</code><br/>` +
+          `artifact: <code>${latestArtifact.name}</code><br/>` +
+          `생성 시각: <code>${new Date(latestArtifact.created_at).toLocaleString()}</code>`;
+      }
+
+      loadLatestApkArtifact().catch((error) => {
+        console.error("APK artifact 링크 로드 실패:", error);
+        setError(`${error.message} 'APK 빌드 워크플로 목록' 버튼으로 수동 접근해 주세요.`);
+      });
+    </script>
+  </body>
+</html>
