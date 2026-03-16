@@ -125,3 +125,4 @@ jobs:
           name: app-release-apk-${{ env.TAG_NAME }}
           path: app-release.apk
           if-no-files-found: error
+
