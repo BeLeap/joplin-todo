@@ -56,6 +56,7 @@ const JOPLIN_METADATA_KEYS = new Set([
   'type_',
   'is_todo',
   'todo_completed',
+  'deleted_time',
   'updated_time',
   'encryption_applied',
 ]);
@@ -122,6 +123,7 @@ const parseJoplinMetadata = (content: string): JoplinRawTodo | null => {
     type_: parseIntegerField(map.get('type_')),
     is_todo: parseIntegerField(map.get('is_todo')),
     todo_completed: parseIntegerField(map.get('todo_completed')),
+    deleted_time: parseIntegerField(map.get('deleted_time')),
     updated_time: parseIntegerField(map.get('updated_time')),
     encryption_applied: parseIntegerField(map.get('encryption_applied')),
   };

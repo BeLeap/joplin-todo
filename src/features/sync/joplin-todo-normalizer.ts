@@ -25,6 +25,10 @@ export const toTodoItem = (rawItem: JoplinRawTodo): TodoItem | null => {
     return null;
   }
 
+  if (Number(rawItem.deleted_time ?? 0) > 0) {
+    return null;
+  }
+
   return {
     id: rawItem.id,
     title: rawItem.title?.trim() || '(제목 없음)',
