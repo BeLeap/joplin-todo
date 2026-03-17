@@ -1,8 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  LayoutAnimation,
   Pressable,
   ScrollView,
   StyleSheet,
+  UIManager,
   View,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
@@ -84,6 +86,12 @@ export default function HomeScreen() {
   const [syncStatusDetail, setSyncStatusDetail] = useState<string | null>(null);
   const [hideCompleted, setHideCompleted] = useState<boolean>(false);
   const [isStatusCardCollapsed, setIsStatusCardCollapsed] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (UIManager.setLayoutAnimationEnabledExperimental) {
+      UIManager.setLayoutAnimationEnabledExperimental(true);
+    }
+  }, []);
 
   const refreshAndroidHomeWidget = useCallback(
     async (reason: string) => {
@@ -297,36 +305,62 @@ export default function HomeScreen() {
   }, [status, syncProgress]);
 
   const COLLAPSE_SCROLL_Y = 20;
-  const EXPAND_SCROLL_Y = 0;
+  const EXPAND_SCROLL_Y = 8;
   const COLLAPSE_TRANSITION_LOCK_MS = 180;
   const lastScrollYRef = useRef(0);
   const collapseTransitionLockUntilRef = useRef(0);
 
+  const setCollapsedWithAnimation = useCallback((nextCollapsed: boolean) => {
+    setIsStatusCardCollapsed((previousCollapsed) => {
+      if (previousCollapsed === nextCollapsed) {
+        return previousCollapsed;
+      }
+
+      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+      return nextCollapsed;
+    });
+  }, []);
+
+  const expandWhenNearTop = useCallback(
+    (y: number) => {
+      if (y > EXPAND_SCROLL_Y) {
+        return;
+      }
+
+      const now = Date.now();
+      if (now < collapseTransitionLockUntilRef.current) {
+        return;
+      }
+
+      collapseTransitionLockUntilRef.current = now + COLLAPSE_TRANSITION_LOCK_MS;
+      setCollapsedWithAnimation(false);
+    },
+    [setCollapsedWithAnimation],
+  );
+
   const handleTodoListScroll = useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
     const now = Date.now();
     const y = event.nativeEvent.contentOffset.y;
-    const previousY = lastScrollYRef.current;
-    const isScrollingUp = y < previousY;
     lastScrollYRef.current = y;
 
-    setIsStatusCardCollapsed((previous) => {
-      if (now < collapseTransitionLockUntilRef.current) {
-        return previous;
-      }
+    if (now < collapseTransitionLockUntilRef.current) {
+      return;
+    }
 
-      if (!previous && y > COLLAPSE_SCROLL_Y) {
-        collapseTransitionLockUntilRef.current = now + COLLAPSE_TRANSITION_LOCK_MS;
-        return true;
-      }
+    if (y > COLLAPSE_SCROLL_Y) {
+      collapseTransitionLockUntilRef.current = now + COLLAPSE_TRANSITION_LOCK_MS;
+      setCollapsedWithAnimation(true);
+      return;
+    }
 
-      if (previous && y <= EXPAND_SCROLL_Y && isScrollingUp) {
-        collapseTransitionLockUntilRef.current = now + COLLAPSE_TRANSITION_LOCK_MS;
-        return false;
-      }
+    expandWhenNearTop(y);
+  }, [expandWhenNearTop, setCollapsedWithAnimation]);
 
-      return previous;
-    });
-  }, []);
+  const handleScrollEnd = useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const y = event.nativeEvent.contentOffset.y;
+    lastScrollYRef.current = y;
+    expandWhenNearTop(y);
+  }, [expandWhenNearTop]);
 
   const hasSignedInSession = hasSession || process.env.EXPO_PUBLIC_ONEDRIVE_ACCESS_TOKEN?.trim();
   return (
@@ -436,6 +470,8 @@ export default function HomeScreen() {
               contentContainerStyle={styles.todoListContent}
               nestedScrollEnabled
               onScroll={handleTodoListScroll}
+              onMomentumScrollEnd={handleScrollEnd}
+              onScrollEndDrag={handleScrollEnd}
               scrollEventThrottle={16}
               showsVerticalScrollIndicator>
               {visibleTodos.length === 0 ? (
