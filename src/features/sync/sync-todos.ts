@@ -54,6 +54,7 @@ export const syncTodosFromOneDrive = async (
         await options.onProgress?.(progress);
       }, async (item) => {
         const todoItem = toTodoItem(item);
+
         if (todoItem) {
           parsedTodoById.set(todoItem.id, todoItem);
           await cache.saveSyncCheckpoint({
@@ -62,7 +63,15 @@ export const syncTodosFromOneDrive = async (
             parsedTodos: Array.from(parsedTodoById.values()),
           });
           await options.onTodoParsed?.(todoItem);
+          return;
         }
+
+        parsedTodoById.delete(item.id);
+        await cache.saveSyncCheckpoint({
+          modifiedSince: snapshot.lastSyncedAt,
+          completed: resumeFromCompleted,
+          parsedTodos: Array.from(parsedTodoById.values()),
+        });
       }, {
         modifiedSince: null,
         resumeFromCompleted,
