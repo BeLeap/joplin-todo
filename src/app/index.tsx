@@ -368,9 +368,6 @@ export default function HomeScreen() {
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.screenContent}>
           <View style={styles.headerSection}>
-            <ThemedText type="smallBold" themeColor="textSecondary">
-              Joplin Widget
-            </ThemedText>
             <View style={styles.titleRow}>
               <ThemedText style={styles.title}>오늘 할 일</ThemedText>
               {isStatusCardCollapsed ? (
