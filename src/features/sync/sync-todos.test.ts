@@ -3,7 +3,7 @@ import test from 'node:test';
 
 import type { JoplinRawTodo } from '@/features/sync/types';
 import { syncTodosFromOneDrive } from '@/features/sync/sync-todos';
-import type { OneDriveJoplinSource, OneDriveSyncProgress } from '@/features/sync/onedrive-source';
+import type { OneDriveDownloadedItem, OneDriveJoplinSource, OneDriveSyncProgress } from '@/features/sync/onedrive-source';
 import { InMemoryTodoCache } from '@/storage/todo-cache';
 
 const createRawTodo = (overrides: Partial<JoplinRawTodo> = {}): JoplinRawTodo => ({
@@ -19,13 +19,13 @@ const createRawTodo = (overrides: Partial<JoplinRawTodo> = {}): JoplinRawTodo =>
 
 class FakeOneDriveSource implements OneDriveJoplinSource {
   constructor(
-    private readonly items: JoplinRawTodo[],
+    private readonly items: { fileName: string; item: JoplinRawTodo | null }[],
     private readonly fileNames: string[],
   ) {}
 
   async listJoplinItems(
     onProgress?: (progress: OneDriveSyncProgress) => void | Promise<void>,
-    onItem?: (item: JoplinRawTodo) => void | Promise<void>,
+    onItem?: (downloadedItem: OneDriveDownloadedItem) => void | Promise<void>,
     options?: {
       modifiedSince?: string | null;
       resumeFromCompleted?: number;
@@ -40,17 +40,19 @@ class FakeOneDriveSource implements OneDriveJoplinSource {
       total: this.items.length,
     });
 
-    for (const [index, item] of this.items.entries()) {
-      await onItem?.(item);
+    for (const [index, downloadedItem] of this.items.entries()) {
+      await onItem?.(downloadedItem);
       await onProgress?.({
         phase: 'downloading',
-        currentFileName: `${item.id}.md`,
+        currentFileName: downloadedItem.fileName,
         completed: index + 1,
         total: this.items.length,
       });
     }
 
-    return this.items;
+    return this.items
+      .map(({ item }) => item)
+      .filter((item): item is JoplinRawTodo => item !== null);
   }
 }
 
@@ -79,7 +81,7 @@ test('removes checkpoint todo when Joplin marks the item deleted', async () => {
   });
 
   const source = new FakeOneDriveSource(
-    [createRawTodo({ id: 'todo-1', title: 'Keep me', deleted_time: 123 })],
+    [{ fileName: 'todo-1.md', item: createRawTodo({ id: 'todo-1', title: 'Keep me', deleted_time: 123 }) }],
     ['todo-1.md'],
   );
 
@@ -95,8 +97,8 @@ test('keeps active todos and only reports parsed items for non-deleted todos', a
   const parsedIds: string[] = [];
   const source = new FakeOneDriveSource(
     [
-      createRawTodo({ id: 'todo-1', title: 'Visible todo' }),
-      createRawTodo({ id: 'todo-2', title: 'Deleted todo', deleted_time: 456 }),
+      { fileName: 'todo-1.md', item: createRawTodo({ id: 'todo-1', title: 'Visible todo' }) },
+      { fileName: 'todo-2.md', item: createRawTodo({ id: 'todo-2', title: 'Deleted todo', deleted_time: 456 }) },
     ],
     ['todo-1.md', 'todo-2.md'],
   );
@@ -112,4 +114,38 @@ test('keeps active todos and only reports parsed items for non-deleted todos', a
     result.todos.map((todo) => todo.id),
     ['todo-1'],
   );
+});
+
+test('removes checkpoint todo when downloaded file is no longer parseable', async () => {
+  const cache = new InMemoryTodoCache();
+  await cache.saveTodos([
+    {
+      id: 'todo-legacy',
+      title: 'Legacy todo',
+      completed: false,
+      updatedTime: new Date(1).toISOString(),
+    },
+  ], '2026-03-17T00:00:00.000Z');
+  await cache.saveSyncCheckpoint({
+    modifiedSince: '2026-03-17T00:00:00.000Z',
+    completed: 0,
+    parsedTodos: [
+      {
+        id: 'todo-legacy',
+        title: 'Legacy todo',
+        completed: false,
+        updatedTime: new Date(1).toISOString(),
+      },
+    ],
+  });
+
+  const source = new FakeOneDriveSource(
+    [{ fileName: 'todo-legacy.md', item: null }],
+    ['todo-legacy.md'],
+  );
+
+  const result = await syncTodosFromOneDrive(source, cache);
+
+  assert.deepEqual(result.todos, []);
+  assert.deepEqual((await cache.loadTodos()).todos, []);
 });

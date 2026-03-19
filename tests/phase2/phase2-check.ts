@@ -6,6 +6,7 @@ import { MockOneDriveJoplinSource } from '@/features/sync/mock-onedrive-source';
 import {
   GraphOneDriveJoplinSource,
   __private__,
+  type OneDriveDownloadedItem,
   type OneDriveJoplinSource,
   type OneDriveSyncProgress,
 } from '@/features/sync/onedrive-source';
@@ -50,7 +51,7 @@ class IncrementalSource implements OneDriveJoplinSource {
 
   async listJoplinItems(
     _onProgress?: (progress: OneDriveSyncProgress) => void,
-    _onItem?: (item: JoplinRawTodo) => void,
+    _onItem?: (downloadedItem: OneDriveDownloadedItem) => void,
     options?: { modifiedSince?: string | null },
   ) {
     if (!options?.modifiedSince) {
@@ -81,7 +82,6 @@ class IncrementalSource implements OneDriveJoplinSource {
   }
 }
 
-
 class CheckpointSpyCache extends InMemoryTodoCache {
   public saveCalls = 0;
   public checkpoints: { modifiedSince: string | null; completed: number; parsedTodos: string[] }[] = [];
@@ -104,7 +104,7 @@ class CheckpointSpyCache extends InMemoryTodoCache {
 class TwoItemSource implements OneDriveJoplinSource {
   async listJoplinItems(
     onProgress?: (progress: OneDriveSyncProgress) => void | Promise<void>,
-    onItem?: (item: JoplinRawTodo) => void | Promise<void>,
+    onItem?: (downloadedItem: OneDriveDownloadedItem) => void | Promise<void>,
   ): Promise<JoplinRawTodo[]> {
     const items: JoplinRawTodo[] = [
       {
@@ -128,11 +128,11 @@ class TwoItemSource implements OneDriveJoplinSource {
     ];
 
     await onProgress?.({ phase: 'downloading', currentFileName: 'todo-checkpoint-1.md', completed: 0, total: 2 });
-    await onItem?.(items[0]!);
+    await onItem?.({ fileName: 'todo-checkpoint-1.md', item: items[0]! });
     await onProgress?.({ phase: 'downloading', currentFileName: 'todo-checkpoint-1.md', completed: 1, total: 2 });
 
     await onProgress?.({ phase: 'downloading', currentFileName: 'todo-checkpoint-2.md', completed: 1, total: 2 });
-    await onItem?.(items[1]!);
+    await onItem?.({ fileName: 'todo-checkpoint-2.md', item: items[1]! });
     await onProgress?.({ phase: 'downloading', currentFileName: 'todo-checkpoint-2.md', completed: 2, total: 2 });
 
     return items;
@@ -145,7 +145,7 @@ class ResumableSource implements OneDriveJoplinSource {
 
   async listJoplinItems(
     onProgress?: (progress: OneDriveSyncProgress) => void,
-    onItem?: (item: JoplinRawTodo) => void,
+    onItem?: (downloadedItem: OneDriveDownloadedItem) => void,
     options?: { modifiedSince?: string | null; resumeFromCompleted?: number },
   ): Promise<JoplinRawTodo[]> {
     const resumeFromCompleted = options?.resumeFromCompleted ?? 0;
@@ -155,13 +155,16 @@ class ResumableSource implements OneDriveJoplinSource {
       this.firstAttemptDone = true;
       onProgress?.({ phase: 'downloading', currentFileName: 'todo-1.md', completed: 0, total: 2 });
       onItem?.({
-        id: 'todo-resume-1',
-        title: 'Resume 1',
-        type_: 1,
-        is_todo: 1,
-        todo_completed: 0,
-        updated_time: Date.now(),
-        encryption_applied: 0,
+        fileName: 'todo-1.md',
+        item: {
+          id: 'todo-resume-1',
+          title: 'Resume 1',
+          type_: 1,
+          is_todo: 1,
+          todo_completed: 0,
+          updated_time: Date.now(),
+          encryption_applied: 0,
+        },
       });
       onProgress?.({ phase: 'downloading', currentFileName: 'todo-1.md', completed: 1, total: 2 });
       throw new OneDriveNetworkError('download interrupted');
