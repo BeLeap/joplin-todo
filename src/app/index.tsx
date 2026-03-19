@@ -122,6 +122,7 @@ export default function HomeScreen() {
     await publishTodosToWidget(widgetBridge, snapshot.todos, snapshot.lastSyncedAt, {
       state: getWidgetSnapshotState(snapshot.todos.length, 'ready'),
     });
+
     await refreshAndroidHomeWidget('load-cached-todos');
   }, [refreshAndroidHomeWidget]);
 
@@ -266,22 +267,22 @@ export default function HomeScreen() {
 
   const statusBadgeStyle = useMemo(() => {
     if (status === 'success') {
-      return { backgroundColor: '#111111', color: '#FFFFFF' };
+      return { backgroundColor: theme.text, color: theme.background };
     }
 
     if (status === 'error') {
-      return { backgroundColor: '#1F1F1F', color: '#FFFFFF' };
+      return { backgroundColor: theme.text, color: theme.background };
     }
 
     if (status === 'syncing') {
-      return { backgroundColor: '#2A2A2A', color: '#FFFFFF' };
+      return { backgroundColor: theme.text, color: theme.background };
     }
 
     return {
       backgroundColor: theme.backgroundElement,
       color: theme.textSecondary,
     };
-  }, [status, theme.backgroundElement, theme.textSecondary]);
+  }, [status, theme.background, theme.backgroundElement, theme.text, theme.textSecondary]);
 
   const compactStatusLabel = useMemo(() => {
     if (status === 'syncing') {
@@ -303,6 +304,14 @@ export default function HomeScreen() {
 
     return '동기화 대기';
   }, [status, syncProgress]);
+
+  const uiColors = useMemo(() => ({
+    line: theme.text,
+    elevatedSurface: theme.background,
+    invertedSurface: theme.text,
+    invertedText: theme.background,
+    statusDetail: status === 'error' ? theme.text : theme.textSecondary,
+  }), [status, theme.background, theme.text, theme.textSecondary]);
 
   const COLLAPSE_SCROLL_Y = 20;
   const EXPAND_SCROLL_Y = 8;
@@ -361,6 +370,8 @@ export default function HomeScreen() {
     lastScrollYRef.current = y;
     expandWhenNearTop(y);
   }, [expandWhenNearTop]);
+
+  const styles = useMemo(() => createStyles(uiColors), [uiColors]);
 
   const hasSignedInSession = hasSession || process.env.EXPO_PUBLIC_ONEDRIVE_ACCESS_TOKEN?.trim();
   return (
@@ -486,9 +497,11 @@ export default function HomeScreen() {
                     <ThemedView
                       style={[
                         styles.todoStatus,
-                        { backgroundColor: todo.completed ? '#111111' : '#FFFFFF' },
+                        { backgroundColor: todo.completed ? uiColors.invertedSurface : uiColors.elevatedSurface },
                       ]}>
-                      <ThemedText type="smallBold" style={{ color: todo.completed ? '#FFFFFF' : '#111111' }}>
+                      <ThemedText
+                        type="smallBold"
+                        style={{ color: todo.completed ? uiColors.invertedText : uiColors.line }}>
                         {todo.completed ? '완료됨' : '진행중'}
                       </ThemedText>
                     </ThemedView>
@@ -503,7 +516,13 @@ export default function HomeScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (uiColors: {
+  line: string;
+  elevatedSurface: string;
+  invertedSurface: string;
+  invertedText: string;
+  statusDetail: string;
+}) => StyleSheet.create({
   container: {
     flex: 1,
     justifyContent: 'center',
@@ -539,13 +558,13 @@ const styles = StyleSheet.create({
   compactStatusBadge: {
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: '#111111',
+    borderColor: uiColors.line,
     paddingHorizontal: Spacing.two,
     paddingVertical: 6,
-    backgroundColor: '#111111',
+    backgroundColor: uiColors.invertedSurface,
   },
   compactStatusText: {
-    color: '#FFFFFF',
+    color: uiColors.invertedText,
   },
   kpiRow: {
     flexDirection: 'row',
@@ -557,7 +576,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.three,
     paddingVertical: Spacing.one,
     borderWidth: 1,
-    borderColor: '#111111',
+    borderColor: uiColors.line,
   },
   statusBadge: {
     borderRadius: 4,
@@ -569,7 +588,7 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     gap: Spacing.two,
     borderWidth: 1,
-    borderColor: '#111111',
+    borderColor: uiColors.line,
   },
   statusCardHeaderRow: {
     flexDirection: 'row',
@@ -581,12 +600,12 @@ const styles = StyleSheet.create({
     gap: Spacing.one,
   },
   statusDetailText: {
-    color: '#111111',
+    color: uiColors.statusDetail,
     fontSize: 13,
     lineHeight: 18,
   },
   statusErrorDetailText: {
-    color: '#111111',
+    color: uiColors.statusDetail,
     fontWeight: 700,
     textDecorationLine: 'underline',
   },
@@ -600,30 +619,30 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.three,
     paddingVertical: Spacing.two,
     borderWidth: 1,
-    borderColor: '#111111',
+    borderColor: uiColors.line,
   },
   actionButtonPrimary: {
-    backgroundColor: '#111111',
+    backgroundColor: uiColors.invertedSurface,
   },
   actionButtonSecondary: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: uiColors.elevatedSurface,
   },
   primaryButtonText: {
-    color: '#FFFFFF',
+    color: uiColors.invertedText,
   },
   secondaryButtonText: {
-    color: '#111111',
+    color: uiColors.line,
   },
   errorBanner: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: uiColors.elevatedSurface,
     borderRadius: 4,
     padding: Spacing.two,
     gap: Spacing.one,
     borderWidth: 1,
-    borderColor: '#111111',
+    borderColor: uiColors.line,
   },
   errorText: {
-    color: '#111111',
+    color: uiColors.line,
   },
   listSection: {
     gap: Spacing.two,
@@ -646,25 +665,25 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     paddingHorizontal: Spacing.two,
     paddingVertical: Spacing.one,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: uiColors.elevatedSurface,
     borderWidth: 1,
-    borderColor: '#111111',
+    borderColor: uiColors.line,
   },
   filterChipActive: {
-    backgroundColor: '#111111',
+    backgroundColor: uiColors.invertedSurface,
   },
   filterChipTextInactive: {
-    color: '#111111',
+    color: uiColors.line,
   },
   filterChipTextActive: {
-    color: '#FFFFFF',
+    color: uiColors.invertedText,
   },
   todoCard: {
     padding: Spacing.three,
     borderRadius: 6,
     gap: Spacing.one,
     borderWidth: 1,
-    borderColor: '#111111',
+    borderColor: uiColors.line,
   },
   todoStatus: {
     alignSelf: 'flex-start',
@@ -673,6 +692,6 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.one,
     marginTop: Spacing.one,
     borderWidth: 1,
-    borderColor: '#111111',
+    borderColor: uiColors.line,
   },
 });
