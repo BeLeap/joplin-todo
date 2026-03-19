@@ -4,7 +4,7 @@ import type { TodoCache } from '@/storage/todo-cache';
 
 import { OneDriveNetworkError } from './errors';
 import { normalizeJoplinTodos, toTodoItem } from './joplin-todo-normalizer';
-import type { OneDriveJoplinSource, OneDriveSyncProgress } from './onedrive-source';
+import type { OneDriveDownloadedItem, OneDriveJoplinSource, OneDriveSyncProgress } from './onedrive-source';
 import type { TodoSyncResult, TodoSyncWithFallbackResult } from './types';
 
 type SyncOptions = {
@@ -23,6 +23,32 @@ const toTodoIdFromFileName = (fileName: string) => {
 
   const todoId = fileName.slice(0, -3).trim();
   return todoId ? todoId : null;
+};
+
+const removeParsedTodoByFileName = (
+  parsedTodoById: Map<string, TodoItem>,
+  fileName: string,
+) => {
+  const todoId = toTodoIdFromFileName(fileName);
+
+  if (!todoId) {
+    return false;
+  }
+
+  return parsedTodoById.delete(todoId);
+};
+
+const persistCheckpoint = async (
+  cache: TodoCache,
+  modifiedSince: string | null,
+  completed: number,
+  parsedTodoById: Map<string, TodoItem>,
+) => {
+  await cache.saveSyncCheckpoint({
+    modifiedSince,
+    completed,
+    parsedTodos: Array.from(parsedTodoById.values()),
+  });
 };
 
 export const syncTodosFromOneDrive = async (
@@ -45,33 +71,27 @@ export const syncTodosFromOneDrive = async (
       const rawItems = await source.listJoplinItems(async (progress) => {
         if (progress.phase === 'downloading') {
           resumeFromCompleted = Math.max(resumeFromCompleted, progress.completed);
-          await cache.saveSyncCheckpoint({
-            modifiedSince: snapshot.lastSyncedAt,
-            completed: resumeFromCompleted,
-            parsedTodos: Array.from(parsedTodoById.values()),
-          });
+          await persistCheckpoint(cache, snapshot.lastSyncedAt, resumeFromCompleted, parsedTodoById);
         }
         await options.onProgress?.(progress);
-      }, async (item) => {
+      }, async ({ fileName, item }: OneDriveDownloadedItem) => {
+        if (!item) {
+          removeParsedTodoByFileName(parsedTodoById, fileName);
+          await persistCheckpoint(cache, snapshot.lastSyncedAt, resumeFromCompleted, parsedTodoById);
+          return;
+        }
+
         const todoItem = toTodoItem(item);
 
         if (todoItem) {
           parsedTodoById.set(todoItem.id, todoItem);
-          await cache.saveSyncCheckpoint({
-            modifiedSince: snapshot.lastSyncedAt,
-            completed: resumeFromCompleted,
-            parsedTodos: Array.from(parsedTodoById.values()),
-          });
+          await persistCheckpoint(cache, snapshot.lastSyncedAt, resumeFromCompleted, parsedTodoById);
           await options.onTodoParsed?.(todoItem);
           return;
         }
 
         parsedTodoById.delete(item.id);
-        await cache.saveSyncCheckpoint({
-          modifiedSince: snapshot.lastSyncedAt,
-          completed: resumeFromCompleted,
-          parsedTodos: Array.from(parsedTodoById.values()),
-        });
+        await persistCheckpoint(cache, snapshot.lastSyncedAt, resumeFromCompleted, parsedTodoById);
       }, {
         modifiedSince: null,
         resumeFromCompleted,
@@ -82,11 +102,12 @@ export const syncTodosFromOneDrive = async (
               parsedTodoById.delete(todoId);
             }
           }
-          await cache.saveSyncCheckpoint({
-            modifiedSince: snapshot.lastSyncedAt,
-            completed: Math.min(resumeFromCompleted, listedTodoIds.size),
-            parsedTodos: Array.from(parsedTodoById.values()),
-          });
+          await persistCheckpoint(
+            cache,
+            snapshot.lastSyncedAt,
+            Math.min(resumeFromCompleted, listedTodoIds.size),
+            parsedTodoById,
+          );
         },
       });
       const parsedTodos = Array.from(parsedTodoById.values());
@@ -112,11 +133,7 @@ export const syncTodosFromOneDrive = async (
       };
     } catch (error) {
       lastError = error;
-      await cache.saveSyncCheckpoint({
-        modifiedSince: snapshot.lastSyncedAt,
-        completed: resumeFromCompleted,
-        parsedTodos: Array.from(parsedTodoById.values()),
-      });
+      await persistCheckpoint(cache, snapshot.lastSyncedAt, resumeFromCompleted, parsedTodoById);
       if (!(error instanceof OneDriveNetworkError) || attempt >= maxRetries) {
         throw error;
       }

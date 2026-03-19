@@ -209,10 +209,15 @@ const toGraphError = async (response: Response, context: GraphRequestContext) =>
   return new OneDriveNetworkError(`OneDrive 요청 실패 | ${detail}`);
 };
 
+export type OneDriveDownloadedItem = {
+  fileName: string;
+  item: JoplinRawTodo | null;
+};
+
 export interface OneDriveJoplinSource {
   listJoplinItems(
     onProgress?: (progress: OneDriveSyncProgress) => void | Promise<void>,
-    onItem?: (item: JoplinRawTodo) => void | Promise<void>,
+    onItem?: (downloadedItem: OneDriveDownloadedItem) => void | Promise<void>,
     options?: {
       modifiedSince?: string | null;
       resumeFromCompleted?: number;
@@ -341,7 +346,7 @@ export class GraphOneDriveJoplinSource implements OneDriveJoplinSource {
 
   async listJoplinItems(
     onProgress?: (progress: OneDriveSyncProgress) => void | Promise<void>,
-    onItem?: (item: JoplinRawTodo) => void | Promise<void>,
+    onItem?: (downloadedItem: OneDriveDownloadedItem) => void | Promise<void>,
     options: {
       modifiedSince?: string | null;
       resumeFromCompleted?: number;
@@ -377,9 +382,10 @@ export class GraphOneDriveJoplinSource implements OneDriveJoplinSource {
       const content = await response.text();
       const parsedItem = parseJoplinMetadata(content);
       rawItems.push(parsedItem);
-      if (parsedItem) {
-        await onItem?.(parsedItem);
-      }
+      await onItem?.({
+        fileName: file.name,
+        item: parsedItem,
+      });
 
       await onProgress?.({
         phase: 'downloading',
