@@ -116,6 +116,41 @@ test('keeps active todos and only reports parsed items for non-deleted todos', a
   );
 });
 
+
+
+test('drops todos that look like trashed Joplin items because deleted_time is set', async () => {
+  const cache = new InMemoryTodoCache();
+  const source = new FakeOneDriveSource(
+    [
+      {
+        fileName: '81505fbad9cc419182146796884e9e2c.md',
+        item: createRawTodo({
+          id: '81505fbad9cc419182146796884e9e2c',
+          title: '휴지통 테스트',
+          deleted_time: 1774228863121,
+          updated_time: Date.parse('2026-03-23T01:21:03.121Z'),
+        }),
+      },
+      {
+        fileName: 'todo-visible.md',
+        item: createRawTodo({
+          id: 'todo-visible',
+          title: 'Visible todo',
+          updated_time: Date.parse('2026-03-23T01:30:00.000Z'),
+        }),
+      },
+    ],
+    ['81505fbad9cc419182146796884e9e2c.md', 'todo-visible.md'],
+  );
+
+  const result = await syncTodosFromOneDrive(source, cache);
+
+  assert.deepEqual(
+    result.todos.map((todo) => todo.id),
+    ['todo-visible'],
+  );
+});
+
 test('removes checkpoint todo when downloaded file is no longer parseable', async () => {
   const cache = new InMemoryTodoCache();
   await cache.saveTodos([
