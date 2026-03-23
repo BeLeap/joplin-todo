@@ -15,5 +15,6 @@ local-apk-build:
     npx eas-cli@latest build --platform android --profile preview --local --output app-release.apk
 
 check:
+    npm run test
     npx expo-doctor
     npx tsc --noEmit
