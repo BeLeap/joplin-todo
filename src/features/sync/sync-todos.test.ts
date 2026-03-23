@@ -1,6 +1,3 @@
-import assert from 'node:assert/strict';
-import test from 'node:test';
-
 import type { JoplinRawTodo } from '@/features/sync/types';
 import { syncTodosFromOneDrive } from '@/features/sync/sync-todos';
 import type { OneDriveDownloadedItem, OneDriveJoplinSource, OneDriveSyncProgress } from '@/features/sync/onedrive-source';
@@ -56,131 +53,125 @@ class FakeOneDriveSource implements OneDriveJoplinSource {
   }
 }
 
-test('removes checkpoint todo when Joplin marks the item deleted', async () => {
-  const cache = new InMemoryTodoCache();
-  const activeTodo = createRawTodo({ id: 'todo-1', title: 'Keep me' });
-  await cache.saveTodos([
-    {
-      id: activeTodo.id,
-      title: activeTodo.title,
-      completed: false,
-      updatedTime: new Date(activeTodo.updated_time).toISOString(),
-    },
-  ], '2026-03-17T00:00:00.000Z');
-  await cache.saveSyncCheckpoint({
-    modifiedSince: '2026-03-17T00:00:00.000Z',
-    completed: 0,
-    parsedTodos: [
+describe('syncTodosFromOneDrive', () => {
+  it('removes checkpoint todo when Joplin marks the item deleted', async () => {
+    const cache = new InMemoryTodoCache();
+    const activeTodo = createRawTodo({ id: 'todo-1', title: 'Keep me' });
+    await cache.saveTodos([
       {
         id: activeTodo.id,
         title: activeTodo.title,
         completed: false,
         updatedTime: new Date(activeTodo.updated_time).toISOString(),
       },
-    ],
+    ], '2026-03-17T00:00:00.000Z');
+    await cache.saveSyncCheckpoint({
+      modifiedSince: '2026-03-17T00:00:00.000Z',
+      completed: 0,
+      parsedTodos: [
+        {
+          id: activeTodo.id,
+          title: activeTodo.title,
+          completed: false,
+          updatedTime: new Date(activeTodo.updated_time).toISOString(),
+        },
+      ],
+    });
+
+    const source = new FakeOneDriveSource(
+      [{ fileName: 'todo-1.md', item: createRawTodo({ id: 'todo-1', title: 'Keep me', deleted_time: 123 }) }],
+      ['todo-1.md'],
+    );
+
+    const result = await syncTodosFromOneDrive(source, cache);
+
+    expect(result.todos).toEqual([]);
+    await expect(cache.loadTodos()).resolves.toMatchObject({ todos: [] });
+    await expect(cache.loadSyncCheckpoint()).resolves.toBeNull();
   });
 
-  const source = new FakeOneDriveSource(
-    [{ fileName: 'todo-1.md', item: createRawTodo({ id: 'todo-1', title: 'Keep me', deleted_time: 123 }) }],
-    ['todo-1.md'],
-  );
+  it('keeps active todos and only reports parsed items for non-deleted todos', async () => {
+    const cache = new InMemoryTodoCache();
+    const parsedIds: string[] = [];
+    const source = new FakeOneDriveSource(
+      [
+        { fileName: 'todo-1.md', item: createRawTodo({ id: 'todo-1', title: 'Visible todo' }) },
+        { fileName: 'todo-2.md', item: createRawTodo({ id: 'todo-2', title: 'Deleted todo', deleted_time: 456 }) },
+      ],
+      ['todo-1.md', 'todo-2.md'],
+    );
 
-  const result = await syncTodosFromOneDrive(source, cache);
+    const result = await syncTodosFromOneDrive(source, cache, {
+      onTodoParsed: (todo) => {
+        parsedIds.push(todo.id);
+      },
+    });
 
-  assert.deepEqual(result.todos, []);
-  assert.deepEqual((await cache.loadTodos()).todos, []);
-  assert.equal(await cache.loadSyncCheckpoint(), null);
-});
-
-test('keeps active todos and only reports parsed items for non-deleted todos', async () => {
-  const cache = new InMemoryTodoCache();
-  const parsedIds: string[] = [];
-  const source = new FakeOneDriveSource(
-    [
-      { fileName: 'todo-1.md', item: createRawTodo({ id: 'todo-1', title: 'Visible todo' }) },
-      { fileName: 'todo-2.md', item: createRawTodo({ id: 'todo-2', title: 'Deleted todo', deleted_time: 456 }) },
-    ],
-    ['todo-1.md', 'todo-2.md'],
-  );
-
-  const result = await syncTodosFromOneDrive(source, cache, {
-    onTodoParsed: (todo) => {
-      parsedIds.push(todo.id);
-    },
+    expect(parsedIds).toEqual(['todo-1']);
+    expect(result.todos.map((todo) => todo.id)).toEqual(['todo-1']);
   });
 
-  assert.deepEqual(parsedIds, ['todo-1']);
-  assert.deepEqual(
-    result.todos.map((todo) => todo.id),
-    ['todo-1'],
-  );
-});
+  it('drops todos that look like trashed Joplin items because deleted_time is set', async () => {
+    const cache = new InMemoryTodoCache();
+    const source = new FakeOneDriveSource(
+      [
+        {
+          fileName: '81505fbad9cc419182146796884e9e2c.md',
+          item: createRawTodo({
+            id: '81505fbad9cc419182146796884e9e2c',
+            title: '휴지통 테스트',
+            deleted_time: 1774228863121,
+            updated_time: Date.parse('2026-03-23T01:21:03.121Z'),
+          }),
+        },
+        {
+          fileName: 'todo-visible.md',
+          item: createRawTodo({
+            id: 'todo-visible',
+            title: 'Visible todo',
+            updated_time: Date.parse('2026-03-23T01:30:00.000Z'),
+          }),
+        },
+      ],
+      ['81505fbad9cc419182146796884e9e2c.md', 'todo-visible.md'],
+    );
 
+    const result = await syncTodosFromOneDrive(source, cache);
 
+    expect(result.todos.map((todo) => todo.id)).toEqual(['todo-visible']);
+  });
 
-test('drops todos that look like trashed Joplin items because deleted_time is set', async () => {
-  const cache = new InMemoryTodoCache();
-  const source = new FakeOneDriveSource(
-    [
-      {
-        fileName: '81505fbad9cc419182146796884e9e2c.md',
-        item: createRawTodo({
-          id: '81505fbad9cc419182146796884e9e2c',
-          title: '휴지통 테스트',
-          deleted_time: 1774228863121,
-          updated_time: Date.parse('2026-03-23T01:21:03.121Z'),
-        }),
-      },
-      {
-        fileName: 'todo-visible.md',
-        item: createRawTodo({
-          id: 'todo-visible',
-          title: 'Visible todo',
-          updated_time: Date.parse('2026-03-23T01:30:00.000Z'),
-        }),
-      },
-    ],
-    ['81505fbad9cc419182146796884e9e2c.md', 'todo-visible.md'],
-  );
-
-  const result = await syncTodosFromOneDrive(source, cache);
-
-  assert.deepEqual(
-    result.todos.map((todo) => todo.id),
-    ['todo-visible'],
-  );
-});
-
-test('removes checkpoint todo when downloaded file is no longer parseable', async () => {
-  const cache = new InMemoryTodoCache();
-  await cache.saveTodos([
-    {
-      id: 'todo-legacy',
-      title: 'Legacy todo',
-      completed: false,
-      updatedTime: new Date(1).toISOString(),
-    },
-  ], '2026-03-17T00:00:00.000Z');
-  await cache.saveSyncCheckpoint({
-    modifiedSince: '2026-03-17T00:00:00.000Z',
-    completed: 0,
-    parsedTodos: [
+  it('removes checkpoint todo when downloaded file is no longer parseable', async () => {
+    const cache = new InMemoryTodoCache();
+    await cache.saveTodos([
       {
         id: 'todo-legacy',
         title: 'Legacy todo',
         completed: false,
         updatedTime: new Date(1).toISOString(),
       },
-    ],
+    ], '2026-03-17T00:00:00.000Z');
+    await cache.saveSyncCheckpoint({
+      modifiedSince: '2026-03-17T00:00:00.000Z',
+      completed: 0,
+      parsedTodos: [
+        {
+          id: 'todo-legacy',
+          title: 'Legacy todo',
+          completed: false,
+          updatedTime: new Date(1).toISOString(),
+        },
+      ],
+    });
+
+    const source = new FakeOneDriveSource(
+      [{ fileName: 'todo-legacy.md', item: null }],
+      ['todo-legacy.md'],
+    );
+
+    const result = await syncTodosFromOneDrive(source, cache);
+
+    expect(result.todos).toEqual([]);
+    await expect(cache.loadTodos()).resolves.toMatchObject({ todos: [] });
   });
-
-  const source = new FakeOneDriveSource(
-    [{ fileName: 'todo-legacy.md', item: null }],
-    ['todo-legacy.md'],
-  );
-
-  const result = await syncTodosFromOneDrive(source, cache);
-
-  assert.deepEqual(result.todos, []);
-  assert.deepEqual((await cache.loadTodos()).todos, []);
 });

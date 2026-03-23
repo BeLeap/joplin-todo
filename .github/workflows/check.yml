@@ -42,5 +42,5 @@ jobs:
       - name: Install just
         uses: taiki-e/install-action@just
 
-      - name: Run check via just
+      - name: Run checks via just
         run: just check
