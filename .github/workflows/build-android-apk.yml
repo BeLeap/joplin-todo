@@ -7,6 +7,9 @@ on:
   push:
     branches:
       - develop
+  pull_request:
+    branches:
+      - develop
 
 jobs:
   create-and-push-tag:
@@ -14,16 +17,17 @@ jobs:
     permissions:
       contents: write
     concurrency:
-      group: ${{ github.workflow }}-tag-${{ github.ref }}
+      group: ${{ github.workflow }}-tag-${{ github.head_ref || github.ref }}
       cancel-in-progress: false
     outputs:
       tag_name: ${{ steps.compute_tag.outputs.tag_name }}
 
     steps:
-      - name: Checkout
+      - name: Checkout build ref
         uses: actions/checkout@v5
         with:
           fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v5
@@ -57,20 +61,19 @@ jobs:
           git push origin "$TAG_NAME"
 
   build-apk:
-    needs: create-and-push-tag
+    needs:
+      - create-and-push-tag
+    if: needs.create-and-push-tag.result == 'success'
     runs-on: ubuntu-latest
     permissions:
       contents: read
 
-    env:
-      TAG_NAME: ${{ needs.create-and-push-tag.outputs.tag_name }}
-
     steps:
-      - name: Checkout
+      - name: Checkout created tag
         uses: actions/checkout@v5
         with:
           fetch-depth: 1
-          ref: refs/tags/${{ env.TAG_NAME }}
+          ref: refs/tags/${{ needs.create-and-push-tag.outputs.tag_name }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v5
@@ -79,8 +82,17 @@ jobs:
           cache: npm
           cache-dependency-path: package-lock.json
 
-      - name: Install dependencies
-        run: npm ci
+      - name: Resolve TAG_NAME
+        env:
+          TAG_NAME: ${{ needs.create-and-push-tag.outputs.tag_name }}
+        run: |
+          if [ -z "$TAG_NAME" ]; then
+            echo "::error::create-and-push-tag job에서 TAG_NAME이 비어 있습니다."
+            exit 1
+          fi
+
+          echo "TAG_NAME=$TAG_NAME" >> "$GITHUB_ENV"
+          echo "Using TAG_NAME=$TAG_NAME"
 
       - name: Validate TAG_NAME
         run: |
@@ -89,7 +101,8 @@ jobs:
             exit 1
           fi
 
-          echo "Using TAG_NAME=$TAG_NAME"
+      - name: Install dependencies
+        run: npm ci
 
       - name: Generate Android project (Expo prebuild)
         run: |
@@ -125,4 +138,3 @@ jobs:
           name: app-release-apk-${{ env.TAG_NAME }}
           path: app-release.apk
           if-no-files-found: error
-
