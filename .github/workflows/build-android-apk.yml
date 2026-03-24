@@ -17,24 +17,17 @@ jobs:
     permissions:
       contents: write
     concurrency:
-      group: ${{ github.workflow }}-tag-${{ github.event_name }}-${{ github.event_name == 'pull_request' && github.event.pull_request.head.ref || github.ref }}
+      group: ${{ github.workflow }}-tag-${{ github.head_ref || github.ref }}
       cancel-in-progress: false
     outputs:
       tag_name: ${{ steps.compute_tag.outputs.tag_name }}
 
     steps:
-      - name: Checkout push ref
-        if: github.event_name == 'push'
+      - name: Checkout build ref
         uses: actions/checkout@v5
         with:
           fetch-depth: 0
-
-      - name: Checkout PR head ref
-        if: github.event_name == 'pull_request'
-        uses: actions/checkout@v5
-        with:
-          fetch-depth: 0
-          ref: ${{ github.event.pull_request.head.sha }}
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v5
