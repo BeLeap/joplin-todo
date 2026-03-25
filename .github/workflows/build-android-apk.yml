@@ -77,8 +77,17 @@ jobs:
         env:
           TAG_NAME: ${{ needs.prepare-build.outputs.tag_name }}
         run: |
-          if git ls-remote --tags origin "refs/tags/$TAG_NAME" | grep -q "$TAG_NAME"; then
-            echo "::error::Tag already exists on origin: $TAG_NAME"
+          REMOTE_TAG_COMMIT=$(git ls-remote --tags origin "refs/tags/$TAG_NAME^{}" | awk '{print $1}')
+
+          if [ -n "$REMOTE_TAG_COMMIT" ]; then
+            if [ "$REMOTE_TAG_COMMIT" = "$GITHUB_SHA" ]; then
+              echo "Tag already exists on origin and points to current commit ($GITHUB_SHA): $TAG_NAME"
+              echo "Skipping tag creation/push because this run is idempotent."
+              exit 0
+            fi
+
+            echo "::error::Tag already exists on origin but points to a different commit: $TAG_NAME"
+            echo "::error::remote=$REMOTE_TAG_COMMIT, current=$GITHUB_SHA"
             exit 1
           fi
 
