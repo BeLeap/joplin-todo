@@ -12,15 +12,11 @@ on:
       - develop
 
 jobs:
-  create-and-push-tag:
+  prepare-build:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    concurrency:
-      group: ${{ github.workflow }}-tag-${{ github.head_ref || github.ref }}
-      cancel-in-progress: false
     outputs:
       tag_name: ${{ steps.compute_tag.outputs.tag_name }}
+      checkout_ref: ${{ steps.resolve_ref.outputs.checkout_ref }}
 
     steps:
       - name: Checkout build ref
@@ -46,9 +42,40 @@ jobs:
           echo "tag_name=$TAG_NAME" >> "$GITHUB_OUTPUT"
           echo "Resolved TAG_NAME=$TAG_NAME"
 
+      - name: Resolve checkout ref
+        id: resolve_ref
+        run: |
+          CHECKOUT_REF="${{ github.event.pull_request.head.sha || github.sha }}"
+
+          if [ -z "$CHECKOUT_REF" ]; then
+            echo "::error::checkout ref를 결정할 수 없습니다."
+            exit 1
+          fi
+
+          echo "checkout_ref=$CHECKOUT_REF" >> "$GITHUB_OUTPUT"
+          echo "Resolved checkout_ref=$CHECKOUT_REF"
+
+  create-and-push-tag:
+    needs:
+      - prepare-build
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    concurrency:
+      group: ${{ github.workflow }}-tag-${{ github.head_ref || github.ref }}
+      cancel-in-progress: false
+
+    steps:
+      - name: Checkout build ref
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          ref: ${{ needs.prepare-build.outputs.checkout_ref }}
+
       - name: Create and push version tag
         env:
-          TAG_NAME: ${{ steps.compute_tag.outputs.tag_name }}
+          TAG_NAME: ${{ needs.prepare-build.outputs.tag_name }}
         run: |
           if git ls-remote --tags origin "refs/tags/$TAG_NAME" | grep -q "$TAG_NAME"; then
             echo "::error::Tag already exists on origin: $TAG_NAME"
@@ -62,18 +89,19 @@ jobs:
 
   build-apk:
     needs:
+      - prepare-build
       - create-and-push-tag
-    if: needs.create-and-push-tag.result == 'success'
+    if: ${{ always() && needs.prepare-build.result == 'success' && (github.event_name == 'pull_request' || needs.create-and-push-tag.result == 'success') }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
 
     steps:
-      - name: Checkout created tag
+      - name: Checkout build ref
         uses: actions/checkout@v5
         with:
           fetch-depth: 1
-          ref: refs/tags/${{ needs.create-and-push-tag.outputs.tag_name }}
+          ref: ${{ needs.prepare-build.outputs.checkout_ref }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v5
@@ -84,10 +112,10 @@ jobs:
 
       - name: Resolve TAG_NAME
         env:
-          TAG_NAME: ${{ needs.create-and-push-tag.outputs.tag_name }}
+          TAG_NAME: ${{ needs.prepare-build.outputs.tag_name }}
         run: |
           if [ -z "$TAG_NAME" ]; then
-            echo "::error::create-and-push-tag job에서 TAG_NAME이 비어 있습니다."
+            echo "::error::prepare-build job에서 TAG_NAME이 비어 있습니다."
             exit 1
           fi
 
