@@ -36,19 +36,6 @@ const widgetPalette = {
   dangerSurface: '#FBF0F0',
 } as const;
 
-const formatSyncedAtLabel = (syncedAt: string | null): string => {
-  if (!syncedAt) {
-    return '동기화 기록 없음';
-  }
-
-  return new Date(syncedAt).toLocaleString('ko-KR', {
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-};
-
 const getStateLabel = (state: WidgetSnapshot['state']): string => {
   if (state === 'ready') return '동기화 완료';
   if (state === 'syncing') return '동기화 중';
@@ -113,52 +100,32 @@ const WidgetRoot = ({ snapshot, explicitError }: { snapshot: WidgetSnapshot | nu
           borderColor: widgetPalette.border,
           borderWidth: 1,
           borderRadius: 10,
-          paddingHorizontal: 12,
-          paddingVertical: 10,
-          marginBottom: 8,
-          flexDirection: 'column',
+          paddingHorizontal: 10,
+          paddingVertical: 7,
+          marginBottom: 6,
+          flexDirection: 'row',
+          justifyContent: 'space-between',
+          alignItems: 'center',
         }}>
-        <FlexWidget
-          style={{
-            width: 'match_parent',
-            flexDirection: 'row',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            marginBottom: 6,
-          }}>
-          <TextWidget
-            text="Joplin TODO"
-            style={{
-              fontSize: 12,
-              color: widgetPalette.textSecondary,
-              fontWeight: '600',
-            }}
-          />
-          <FlexWidget
-            style={{
-            backgroundColor: widgetPalette.accentSoft,
-            borderRadius: 999,
-            paddingHorizontal: 8,
-            paddingVertical: 4,
-            borderWidth: 1,
-            borderColor: widgetPalette.border,
-            }}>
-            <TextWidget text={getStateLabel(state)} style={{ fontSize: 10, color: widgetPalette.textSecondary, fontWeight: '700' }} />
-          </FlexWidget>
-        </FlexWidget>
         <TextWidget
-          text={`${todos.length}개의 할 일`}
+          text={`${todos.length}개`}
           style={{
-            fontSize: 24,
+            fontSize: 18,
             color: widgetPalette.text,
             fontWeight: '700',
-            marginBottom: 4,
           }}
         />
-        <TextWidget
-          text={`업데이트 ${formatSyncedAtLabel(snapshot?.lastSyncedAt ?? null)}`}
-          style={{ fontSize: 11, color: widgetPalette.textSecondary }}
-        />
+        <FlexWidget
+          style={{
+            backgroundColor: widgetPalette.accentSoft,
+            borderRadius: 999,
+            paddingHorizontal: 7,
+            paddingVertical: 3,
+            borderWidth: 1,
+            borderColor: widgetPalette.border,
+          }}>
+          <TextWidget text={getStateLabel(state)} style={{ fontSize: 9, color: widgetPalette.textSecondary, fontWeight: '700' }} />
+        </FlexWidget>
       </FlexWidget>
 
       {errorText ? (
