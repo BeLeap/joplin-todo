@@ -25,12 +25,15 @@ const widgetBridge = createWidgetBridge();
 const cache = new AsyncStorageTodoCache();
 
 const widgetPalette = {
-  text: '#000000',
-  background: '#FFFFFF',
-  backgroundElement: '#F0F0F3',
-  backgroundSelected: '#E0E1E6',
-  textSecondary: '#60646C',
+  text: '#111111',
+  background: '#FAFAF8',
+  surface: '#FFFFFF',
+  border: '#D8D8D2',
+  textSecondary: '#5F5F58',
+  accent: '#1F1F1F',
+  accentSoft: '#EFEFEB',
   danger: '#7F1D1D',
+  dangerSurface: '#FBF0F0',
 } as const;
 
 const formatSyncedAtLabel = (syncedAt: string | null): string => {
@@ -90,6 +93,8 @@ const WidgetRoot = ({ snapshot, explicitError }: { snapshot: WidgetSnapshot | nu
   const todos = snapshot?.todos.filter((todo) => !todo.completed) ?? [];
   const state = snapshot?.state ?? 'empty';
   const errorText = explicitError ?? snapshot?.errorMessage ?? null;
+  const previewTodos = todos.slice(0, 4);
+  const hiddenCount = Math.max(todos.length - previewTodos.length, 0);
 
   return (
     <FlexWidget
@@ -97,64 +102,61 @@ const WidgetRoot = ({ snapshot, explicitError }: { snapshot: WidgetSnapshot | nu
         height: 'match_parent',
         width: 'match_parent',
         backgroundColor: widgetPalette.background,
-        padding: 16,
+        padding: 12,
         flexDirection: 'column',
         justifyContent: 'flex-start',
       }}>
       <FlexWidget
         style={{
           width: 'match_parent',
-          flexDirection: 'row',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          marginBottom: 10,
-        }}>
-        <TextWidget
-          text="오늘 할 일"
-          style={{
-            fontSize: 20,
-            color: widgetPalette.text,
-            fontWeight: '700',
-          }}
-        />
-        <FlexWidget
-          style={{
-            backgroundColor: widgetPalette.text,
-            borderRadius: 999,
-            paddingHorizontal: 10,
-            paddingVertical: 6,
-          }}>
-          <TextWidget text={getStateLabel(state)} style={{ fontSize: 11, color: widgetPalette.background, fontWeight: '700' }} />
-        </FlexWidget>
-      </FlexWidget>
-
-      <FlexWidget
-        style={{
-          backgroundColor: widgetPalette.backgroundElement,
-          borderRadius: 6,
-          padding: 12,
-          marginBottom: 10,
+          backgroundColor: widgetPalette.surface,
+          borderColor: widgetPalette.border,
           borderWidth: 1,
-          borderColor: widgetPalette.text,
+          borderRadius: 10,
+          paddingHorizontal: 12,
+          paddingVertical: 10,
+          marginBottom: 8,
           flexDirection: 'column',
         }}>
-        <FlexWidget style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
+        <FlexWidget
+          style={{
+            width: 'match_parent',
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginBottom: 6,
+          }}>
+          <TextWidget
+            text="Joplin TODO"
+            style={{
+              fontSize: 12,
+              color: widgetPalette.textSecondary,
+              fontWeight: '600',
+            }}
+          />
           <FlexWidget
             style={{
-              borderRadius: 4,
-              paddingHorizontal: 10,
-              paddingVertical: 4,
-              borderWidth: 1,
-              borderColor: widgetPalette.text,
-              backgroundColor: widgetPalette.background,
-              marginRight: 8,
+            backgroundColor: widgetPalette.accentSoft,
+            borderRadius: 999,
+            paddingHorizontal: 8,
+            paddingVertical: 4,
+            borderWidth: 1,
+            borderColor: widgetPalette.border,
             }}>
-            <TextWidget text={`항목 ${todos.length}개`} style={{ fontSize: 11, color: widgetPalette.text, fontWeight: '700' }} />
+            <TextWidget text={getStateLabel(state)} style={{ fontSize: 10, color: widgetPalette.textSecondary, fontWeight: '700' }} />
           </FlexWidget>
-          <TextWidget text="Joplin TODO" style={{ fontSize: 12, color: widgetPalette.textSecondary }} />
         </FlexWidget>
         <TextWidget
-          text={`마지막 동기화: ${formatSyncedAtLabel(snapshot?.lastSyncedAt ?? null)}`}
+          text={`${todos.length}개의 할 일`}
+          style={{
+            fontSize: 24,
+            color: widgetPalette.text,
+            fontWeight: '700',
+            marginBottom: 4,
+          }}
+        />
+        <TextWidget
+          text={`업데이트 ${formatSyncedAtLabel(snapshot?.lastSyncedAt ?? null)}`}
           style={{ fontSize: 11, color: widgetPalette.textSecondary }}
         />
       </FlexWidget>
@@ -162,12 +164,12 @@ const WidgetRoot = ({ snapshot, explicitError }: { snapshot: WidgetSnapshot | nu
       {errorText ? (
         <FlexWidget
           style={{
-            backgroundColor: widgetPalette.background,
-            borderRadius: 6,
+            backgroundColor: widgetPalette.dangerSurface,
+            borderRadius: 8,
             padding: 10,
-            marginBottom: 10,
+            marginBottom: 8,
             borderWidth: 1,
-            borderColor: widgetPalette.text,
+            borderColor: widgetPalette.danger,
           }}>
           <TextWidget text="오류 발생" style={{ color: widgetPalette.danger, fontSize: 11, fontWeight: '700', marginBottom: 2 }} />
           <TextWidget text={errorText} style={{ color: widgetPalette.danger, fontSize: 11 }} />
@@ -177,11 +179,11 @@ const WidgetRoot = ({ snapshot, explicitError }: { snapshot: WidgetSnapshot | nu
       {todos.length === 0 ? (
         <FlexWidget
           style={{
-            backgroundColor: widgetPalette.backgroundElement,
-            borderRadius: 6,
+            backgroundColor: widgetPalette.surface,
+            borderRadius: 8,
             padding: 12,
             borderWidth: 1,
-            borderColor: widgetPalette.text,
+            borderColor: widgetPalette.border,
           }}>
           <TextWidget text="표시할 미완료 항목이 없습니다." style={{ color: widgetPalette.textSecondary, fontSize: 12 }} />
         </FlexWidget>
@@ -191,34 +193,53 @@ const WidgetRoot = ({ snapshot, explicitError }: { snapshot: WidgetSnapshot | nu
             width: 'match_parent',
             height: 'match_parent',
           }}>
-          {todos.map((todo, index) => (
+          {previewTodos.map((todo, index) => (
             <FlexWidget
               key={todo.id}
               style={{
-                flexDirection: 'column',
-                marginBottom: index === todos.length - 1 ? 0 : 8,
-                padding: 12,
-                backgroundColor: widgetPalette.backgroundElement,
-                borderRadius: 6,
+                flexDirection: 'row',
+                alignItems: 'center',
+                marginBottom: index === previewTodos.length - 1 && hiddenCount === 0 ? 0 : 6,
+                paddingHorizontal: 10,
+                paddingVertical: 8,
+                backgroundColor: widgetPalette.surface,
+                borderRadius: 8,
                 borderWidth: 1,
-                borderColor: widgetPalette.text,
+                borderColor: widgetPalette.border,
               }}>
-              <TextWidget text={todo.title} style={{ fontSize: 13, color: widgetPalette.text, fontWeight: '600' }} />
-              <FlexWidget style={{ flexDirection: 'row', marginTop: 6 }}>
-                <FlexWidget
-                  style={{
-                    borderRadius: 4,
-                    paddingHorizontal: 8,
-                    paddingVertical: 4,
-                    borderWidth: 1,
-                    borderColor: widgetPalette.text,
-                    backgroundColor: widgetPalette.background,
-                  }}>
-                  <TextWidget text="진행중" style={{ fontSize: 11, color: widgetPalette.text, fontWeight: '700' }} />
-                </FlexWidget>
-              </FlexWidget>
+              <FlexWidget
+                style={{
+                  width: 7,
+                  height: 7,
+                  borderRadius: 999,
+                  backgroundColor: widgetPalette.accent,
+                  marginRight: 8,
+                }}
+              />
+              <TextWidget text={todo.title} style={{ fontSize: 12, color: widgetPalette.text, fontWeight: '500' }} />
             </FlexWidget>
           ))}
+          {hiddenCount > 0 ? (
+            <FlexWidget
+              style={{
+                flexDirection: 'row',
+                justifyContent: 'center',
+                marginTop: 2,
+                marginBottom: 2,
+              }}>
+                <FlexWidget
+                  style={{
+                    borderRadius: 999,
+                    paddingHorizontal: 10,
+                    paddingVertical: 5,
+                    borderWidth: 1,
+                    borderColor: widgetPalette.border,
+                    backgroundColor: widgetPalette.accentSoft,
+                  }}>
+                  <TextWidget text={`+${hiddenCount}개 더 있음`} style={{ fontSize: 10, color: widgetPalette.textSecondary, fontWeight: '700' }} />
+                </FlexWidget>
+              </FlexWidget>
+          ) : null}
         </ListWidget>
       )}
     </FlexWidget>
