@@ -313,11 +313,15 @@ export default function HomeScreen() {
     statusDetail: status === 'error' ? theme.text : theme.textSecondary,
   }), [status, theme.background, theme.text, theme.textSecondary]);
 
-  const COLLAPSE_SCROLL_Y = 20;
-  const EXPAND_SCROLL_Y = 8;
-  const COLLAPSE_TRANSITION_LOCK_MS = 180;
+  const COLLAPSE_ENTER_Y = 36;
+  const COLLAPSE_EXIT_Y = 12;
+  const MIN_DIRECTION_CHANGE_Y = 4;
   const lastScrollYRef = useRef(0);
-  const collapseTransitionLockUntilRef = useRef(0);
+  const statusCardCollapsedRef = useRef(isStatusCardCollapsed);
+
+  useEffect(() => {
+    statusCardCollapsedRef.current = isStatusCardCollapsed;
+  }, [isStatusCardCollapsed]);
 
   const setCollapsedWithAnimation = useCallback((nextCollapsed: boolean) => {
     setIsStatusCardCollapsed((previousCollapsed) => {
@@ -330,46 +334,55 @@ export default function HomeScreen() {
     });
   }, []);
 
-  const expandWhenNearTop = useCallback(
-    (y: number) => {
-      if (y > EXPAND_SCROLL_Y) {
+  const commitCollapseStateForOffset = useCallback(
+    (offsetY: number, deltaY: number) => {
+      const y = Math.max(0, offsetY);
+      const isCollapsed = statusCardCollapsedRef.current;
+
+      if (!isCollapsed && y >= COLLAPSE_ENTER_Y && deltaY > MIN_DIRECTION_CHANGE_Y) {
+        setCollapsedWithAnimation(true);
         return;
       }
 
-      const now = Date.now();
-      if (now < collapseTransitionLockUntilRef.current) {
-        return;
+      if (isCollapsed && y <= COLLAPSE_EXIT_Y && deltaY < -MIN_DIRECTION_CHANGE_Y) {
+        setCollapsedWithAnimation(false);
       }
-
-      collapseTransitionLockUntilRef.current = now + COLLAPSE_TRANSITION_LOCK_MS;
-      setCollapsedWithAnimation(false);
     },
     [setCollapsedWithAnimation],
   );
 
-  const handleTodoListScroll = useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const now = Date.now();
-    const y = event.nativeEvent.contentOffset.y;
-    lastScrollYRef.current = y;
+  const handleTodoListScroll = useCallback(
+    (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+      const nextY = Math.max(0, event.nativeEvent.contentOffset.y);
+      const previousY = lastScrollYRef.current;
+      const deltaY = nextY - previousY;
 
-    if (now < collapseTransitionLockUntilRef.current) {
-      return;
-    }
+      lastScrollYRef.current = nextY;
+      commitCollapseStateForOffset(nextY, deltaY);
+    },
+    [commitCollapseStateForOffset],
+  );
 
-    if (y > COLLAPSE_SCROLL_Y) {
-      collapseTransitionLockUntilRef.current = now + COLLAPSE_TRANSITION_LOCK_MS;
-      setCollapsedWithAnimation(true);
-      return;
-    }
+  const handleScrollEnd = useCallback(
+    (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+      const y = Math.max(0, event.nativeEvent.contentOffset.y);
+      const deltaY = y - lastScrollYRef.current;
+      lastScrollYRef.current = y;
 
-    expandWhenNearTop(y);
-  }, [expandWhenNearTop, setCollapsedWithAnimation]);
+      if (y <= COLLAPSE_EXIT_Y) {
+        setCollapsedWithAnimation(false);
+        return;
+      }
 
-  const handleScrollEnd = useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const y = event.nativeEvent.contentOffset.y;
-    lastScrollYRef.current = y;
-    expandWhenNearTop(y);
-  }, [expandWhenNearTop]);
+      if (y >= COLLAPSE_ENTER_Y) {
+        setCollapsedWithAnimation(true);
+        return;
+      }
+
+      commitCollapseStateForOffset(y, deltaY);
+    },
+    [commitCollapseStateForOffset, setCollapsedWithAnimation],
+  );
 
   const styles = useMemo(() => createStyles(uiColors), [uiColors]);
 
