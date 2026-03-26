@@ -4,6 +4,7 @@ import React, { useEffect } from 'react';
 import { useColorScheme } from 'react-native';
 
 import { AnimatedSplashOverlay } from '@/components/animated-icon';
+import { registerPeriodicTodoBackgroundSync } from '@/features/sync/background-sync-task';
 import { registerJoplinHomeWidgetTask } from '@/features/widget/android-home-widget';
 
 export default function RootLayout() {
@@ -11,6 +12,9 @@ export default function RootLayout() {
 
   useEffect(() => {
     registerJoplinHomeWidgetTask();
+    registerPeriodicTodoBackgroundSync().catch((error: unknown) => {
+      console.error('[background-sync-registration-failed]', error);
+    });
   }, []);
 
   return (
