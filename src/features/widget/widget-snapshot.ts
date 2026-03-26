@@ -7,7 +7,7 @@ const WIDGET_SNAPSHOT_VERSION = 1;
 export const createWidgetSnapshot = (
   todos: TodoItem[],
   lastSyncedAt: string | null,
-  maxItems = 20,
+  maxItems = Number.MAX_SAFE_INTEGER,
   state: WidgetSnapshotState = todos.length > 0 ? 'ready' : 'empty',
   errorMessage: string | null = null,
 ): WidgetSnapshot => {
