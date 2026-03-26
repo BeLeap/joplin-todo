@@ -145,6 +145,18 @@ just remote-apk-build
 - 앱 설정: `app.json` plugin(`react-native-android-widget`)에 위젯 정의 포함
 - 참고: 위젯 설정 변경 후에는 `npx expo run:android` 또는 EAS 재빌드가 필요합니다.
 
+### 백그라운드 주기 동기화 동작(현재)
+
+- 현재 구현은 두 경로를 함께 사용합니다.
+  - **BackgroundTask 경로**: Android 백그라운드 작업으로 주기 동기화를 등록합니다(최소 30분 간격 요청).
+  - **위젯 경로**: 위젯 렌더/업데이트 시점에 `widget:refresh-at` due 여부를 확인해 추가 동기화를 수행합니다.
+- 단, Android 시스템 정책상 주기 실행 시각은 정확히 고정되지 않으며, 절전/제조사 정책으로 지연될 수 있습니다.
+
+### 엄격한 주기 실행이 필요할 때
+
+- 현재도 내부적으로 Android WorkManager 기반 BackgroundTask를 사용하지만, 시스템이 실행 시각을 조정할 수 있습니다.
+- SLA가 매우 엄격한 경우에는 서버 푸시/알림 기반 재기동 등 대체 트리거 전략을 함께 고려하세요.
+
 ---
 
 ## 저장 데이터(로컬)
