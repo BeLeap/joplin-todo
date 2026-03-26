@@ -80,8 +80,6 @@ const WidgetRoot = ({ snapshot, explicitError }: { snapshot: WidgetSnapshot | nu
   const todos = snapshot?.todos.filter((todo) => !todo.completed) ?? [];
   const state = snapshot?.state ?? 'empty';
   const errorText = explicitError ?? snapshot?.errorMessage ?? null;
-  const previewTodos = todos.slice(0, 4);
-  const hiddenCount = Math.max(todos.length - previewTodos.length, 0);
 
   return (
     <FlexWidget
@@ -161,13 +159,13 @@ const WidgetRoot = ({ snapshot, explicitError }: { snapshot: WidgetSnapshot | nu
             width: 'match_parent',
             height: 'match_parent',
           }}>
-          {previewTodos.map((todo, index) => (
+          {todos.map((todo, index) => (
             <FlexWidget
               key={todo.id}
               style={{
                 flexDirection: 'row',
                 alignItems: 'center',
-                marginBottom: index === previewTodos.length - 1 && hiddenCount === 0 ? 0 : 6,
+                marginBottom: index === todos.length - 1 ? 0 : 6,
                 paddingHorizontal: 10,
                 paddingVertical: 8,
                 backgroundColor: widgetPalette.surface,
@@ -187,27 +185,6 @@ const WidgetRoot = ({ snapshot, explicitError }: { snapshot: WidgetSnapshot | nu
               <TextWidget text={todo.title} style={{ fontSize: 12, color: widgetPalette.text, fontWeight: '500' }} />
             </FlexWidget>
           ))}
-          {hiddenCount > 0 ? (
-            <FlexWidget
-              style={{
-                flexDirection: 'row',
-                justifyContent: 'center',
-                marginTop: 2,
-                marginBottom: 2,
-              }}>
-                <FlexWidget
-                  style={{
-                    borderRadius: 999,
-                    paddingHorizontal: 10,
-                    paddingVertical: 5,
-                    borderWidth: 1,
-                    borderColor: widgetPalette.border,
-                    backgroundColor: widgetPalette.accentSoft,
-                  }}>
-                  <TextWidget text={`+${hiddenCount}개 더 있음`} style={{ fontSize: 10, color: widgetPalette.textSecondary, fontWeight: '700' }} />
-                </FlexWidget>
-              </FlexWidget>
-          ) : null}
         </ListWidget>
       )}
     </FlexWidget>
