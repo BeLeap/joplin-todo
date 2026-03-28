@@ -313,10 +313,8 @@ export default function HomeScreen() {
     statusDetail: status === 'error' ? theme.text : theme.textSecondary,
   }), [status, theme.background, theme.text, theme.textSecondary]);
 
-  const COLLAPSE_ENTER_Y = 36;
-  const COLLAPSE_EXIT_Y = 12;
-  const MIN_DIRECTION_CHANGE_Y = 4;
-  const lastScrollYRef = useRef(0);
+  const COLLAPSE_ENTER_Y = 72;
+  const COLLAPSE_EXIT_Y = 0;
   const statusCardCollapsedRef = useRef(isStatusCardCollapsed);
 
   useEffect(() => {
@@ -334,17 +332,17 @@ export default function HomeScreen() {
     });
   }, []);
 
-  const commitCollapseStateForOffset = useCallback(
-    (offsetY: number, deltaY: number) => {
+  const syncCollapseStateForOffset = useCallback(
+    (offsetY: number) => {
       const y = Math.max(0, offsetY);
       const isCollapsed = statusCardCollapsedRef.current;
 
-      if (!isCollapsed && y >= COLLAPSE_ENTER_Y && deltaY > MIN_DIRECTION_CHANGE_Y) {
+      if (!isCollapsed && y >= COLLAPSE_ENTER_Y) {
         setCollapsedWithAnimation(true);
         return;
       }
 
-      if (isCollapsed && y <= COLLAPSE_EXIT_Y && deltaY < -MIN_DIRECTION_CHANGE_Y) {
+      if (isCollapsed && y <= COLLAPSE_EXIT_Y) {
         setCollapsedWithAnimation(false);
       }
     },
@@ -353,35 +351,16 @@ export default function HomeScreen() {
 
   const handleTodoListScroll = useCallback(
     (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-      const nextY = Math.max(0, event.nativeEvent.contentOffset.y);
-      const previousY = lastScrollYRef.current;
-      const deltaY = nextY - previousY;
-
-      lastScrollYRef.current = nextY;
-      commitCollapseStateForOffset(nextY, deltaY);
+      syncCollapseStateForOffset(event.nativeEvent.contentOffset.y);
     },
-    [commitCollapseStateForOffset],
+    [syncCollapseStateForOffset],
   );
 
   const handleScrollEnd = useCallback(
     (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-      const y = Math.max(0, event.nativeEvent.contentOffset.y);
-      const deltaY = y - lastScrollYRef.current;
-      lastScrollYRef.current = y;
-
-      if (y <= COLLAPSE_EXIT_Y) {
-        setCollapsedWithAnimation(false);
-        return;
-      }
-
-      if (y >= COLLAPSE_ENTER_Y) {
-        setCollapsedWithAnimation(true);
-        return;
-      }
-
-      commitCollapseStateForOffset(y, deltaY);
+      syncCollapseStateForOffset(event.nativeEvent.contentOffset.y);
     },
-    [commitCollapseStateForOffset, setCollapsedWithAnimation],
+    [syncCollapseStateForOffset],
   );
 
   const styles = useMemo(() => createStyles(uiColors), [uiColors]);
