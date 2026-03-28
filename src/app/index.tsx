@@ -313,8 +313,8 @@ export default function HomeScreen() {
     statusDetail: status === 'error' ? theme.text : theme.textSecondary,
   }), [status, theme.background, theme.text, theme.textSecondary]);
 
-  const COLLAPSE_ENTER_Y = 36;
-  const COLLAPSE_EXIT_Y = 2;
+  const COLLAPSE_ENTER_Y = 72;
+  const COLLAPSE_EXIT_Y = 0;
   const statusCardCollapsedRef = useRef(isStatusCardCollapsed);
 
   useEffect(() => {
